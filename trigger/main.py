@@ -142,6 +142,10 @@ while True:
                     # Future addition: retract old plan and send new one
                     raise MyException(f'Already triggered on {superevent_id}') 
                 
+                if Time.now().mjd - mjd > 1:
+                    # don't trigger on events older than 1 day
+                    raise MyException(f'{superevent_id} is more than 1 day old') 
+                
                 if testing:
                     print(f'Plan for {superevent_id} has {total_time} seconds and {probability} probability - would trigger ZTF')
                     raise MyException(f'Dont actually trigger {superevent_id} in testing mode') 

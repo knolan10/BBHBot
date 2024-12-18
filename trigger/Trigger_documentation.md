@@ -26,7 +26,7 @@ The steps executed in [main](./main.py) go as follows:
 
 5. We submit a plan request to Fritz, which uses Gwemopt to produce an observing plan for ZTF and the given localization.
 
-6. We then pause for 15 seconds, and then begin querying Fritz every 30 seconds up to 5 minutes to retrieve the generated observing plan.
+6. We pause for 15 seconds, and then begin querying Fritz every 30 seconds up to 5 minutes to retrieve the generated observing plan.
 
 7. As an extra check, we retrieve the items in the ZTF queue for the upcoming night. We do a wordsearch for the superevent id from Gracedb, for the date observed which is used as an identifier on Fritz, and for the `gcnevent_id` assigned by Fritz. If we find any of these ids, we note that there has been a trigger by another group, and while we continue some more steps, we ultimately will not trigger.
 
@@ -35,6 +35,7 @@ The steps executed in [main](./main.py) go as follows:
 
 9. Now we are left with good events for a trigger. However, we or another group may have already triggered on the event! We process already triggered events up to this point so that if they were submitted but the latest GCN make them no longer viable, then we can record that.
     - If the event has been triggered by us, or was found in the ZTF queue for this night, we stop here.
+    - If the event is more than a day old, we stop here.
 
 10. We submit the plan to the ZTF queue, and update our bookkeeping:
     - We add the event to [triggered_events](./data/triggered_events.csv)
