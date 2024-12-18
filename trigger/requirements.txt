@@ -1,0 +1,9 @@
+astropy
+astropy-healpix
+astroplan
+numpy
+gcn_kafka
+pandas
+PyYAML
+scikit-learn
+xmltodict
