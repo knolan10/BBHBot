@@ -115,7 +115,7 @@ while True:
                 #API call to Kowalski - check for event keywords in ZTF observing queue
                 if not testing:
                     keyword_list = [dateobs, superevent_id, gcnevent_id]    
-                    kowalski_event_status = query_kowalski_ztf_queue(keyword_list, fritz_token)
+                    kowalski_event_status = query_kowalski_ztf_queue(keyword_list, fritz_token, allocation)
                 else:
                     kowalski_event_status = False
                 
