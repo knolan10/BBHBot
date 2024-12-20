@@ -1,6 +1,5 @@
 # Trigger
 
-## Table of Contents
 - [Introduction](#introduction)
 - [In Depth Description](#in-depth-description)
 - [Phase 2 Additions](#phase-2-additions)
@@ -43,11 +42,13 @@ The steps executed in [main](./main.py) go as follows:
 
 ## Phase 2 Additions 
 
-1. A separate script will regularly check the [triggered_events](./data/triggered_events.csv) and submit additional observations for triggered events over a period of 50 days.
+Status: code is written and currently being tested
+
+1. A separate script [cadence.py](./cadence.py) will daily check the [triggered_events](./data/triggered_events.csv) and submit additional observations for triggered events over a period of 50 days.
 
 2. If it is before the start of the night and we receive a new GCN for a triggered event, we retract the submitted trigger and submit the new plan.
 
-3. Check for ZTF observations the previous 2 nights and skip TOO if the localization was already covered.
+3. Check for ZTF observations the previous ~2 nights and skip TOO if the localization was already covered.
 
 ## Technical Points
 - We use a Docker container to run this program. A persistent volume is used to store a file that records our triggers in the [data](./data) directory.

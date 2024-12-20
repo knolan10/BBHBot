@@ -1,6 +1,5 @@
 # Cadence
 
-## Table of Contents
 - [Introduction](#introduction)
 - [In Depth Description](#in-depth-description)
 - [Technical Points](#technical-points)

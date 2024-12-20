@@ -6,7 +6,6 @@ from triggerfunctions import update_trigger_log, check_executed_observation, sen
 class MyException(Exception):
     pass
 
-
 def check_pending_observations(df):
     """
     Check if we have pending observations
