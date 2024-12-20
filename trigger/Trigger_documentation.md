@@ -27,7 +27,7 @@ The steps executed in [main](./main.py) go as follows:
 
 6. We pause for 15 seconds, and then begin querying Fritz every 30 seconds up to 5 minutes to retrieve the generated observing plan.
 
-7. As an extra check, we retrieve the items in the ZTF queue for the upcoming night. We do a wordsearch for the superevent id from Gracedb, for the date observed which is used as an identifier on Fritz, and for the `gcnevent_id` assigned by Fritz. If we find any of these ids, we note that there has been a trigger by another group, and while we continue some more steps, we ultimately will not trigger.
+7. As an extra check, we retrieve the items in the ZTF queue for the upcoming night. We do a wordsearch for the `superevent_id` from Gracedb, for the `dateobs` which is used as an identifier on Fritz, and for the `gcnevent_id` assigned by Fritz. If we find any of these ids, we note that there has been a trigger by another group, and while we continue some more steps, we ultimately will not trigger.
 
 8. We check if the plan has total_time < 5400 and probability > 0.5
     - If these criteria aren't met, we stop here, and indicate the event is no longer viable in our tracking file if necessary.

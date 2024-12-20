@@ -138,7 +138,6 @@ while True:
                         delete_trigger_ztf(trigger_plan_id, fritz_token, mode)
                     raise MyException(f'Plan for {superevent_id} with {total_time} seconds and {probability} probability does not meet criteria') 
                             
-                # future additon: check if ZTF will naturaly cover the skymap within +/- 1 day
                 if Time.now().mjd - mjd > 1:
                     # don't trigger on events older than 1 day
                     raise MyException(f'{superevent_id} is more than 1 day old') 
