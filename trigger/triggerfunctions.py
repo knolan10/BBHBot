@@ -129,8 +129,19 @@ def compute_plan_start_end():
     # necessary? to be safe go an hour before sunset
     startdate_return = (startdate - TimeDelta(1*3600, format='sec')).utc.iso
     enddate_return = (startdate + TimeDelta(1*3600*15, format='sec')).utc.iso
-
     return startdate_return, enddate_return
+
+def check_before_sunset():
+    location = EarthLocation(lat=33, lon=-116, height=1712) #Palomar
+    observer = Observer(location=location, timezone='US/Pacific')
+    now = Time.now()
+    sunset_time = observer.sun_set_time(now, which='next')
+    sunrise_time = observer.sun_rise_time(now, which='next')
+    if sunrise_time < sunset_time:
+        before_sunset = False
+    else:
+        before_sunset = True
+    return before_sunset
 
 def submit_plan(token, allocation_id, gracedbid, gcnevent_id, localization_id, mode):
     startdate, enddate = compute_plan_start_end()
@@ -229,7 +240,6 @@ def get_plan_stats(gcnevent_id, queuename, token, mode):
     except Exception as e:
         print(f'error: {e}')
         return None
-    
 
 # kowalski api call to check current observing queue
 def query_kowalski_ztf_queue(keywords, token, allocation):
@@ -260,6 +270,41 @@ def trigger_ztf(plan_request_id, token, mode):
     response = requests.request('POST', endpoint, headers=headers)
     if response.status_code != 200: 
         raise MyException(f'Could not trigger - {response.status_code} - {response.text}')
+    
+def delete_trigger_ztf(plan_request_id, token, mode):
+    """
+    delete a triggered plan request
+    """
+    headers = {'Authorization': f'token {token}'}
+    endpoint = f'https://{mode}fritz.science/api/observation_plan/{plan_request_id}/queue'
+    response = requests.request('DELETE', endpoint, headers=headers)
+    if response.status_code != 200: 
+        raise MyException(f'Could not trigger - {response.status_code} - {response.text}')
+
+
+#### Note - probably need to improve this
+def check_executed_observation(startdate, enddate, gcnid, token, mode):
+    """
+    verify that we observed the event
+    """
+
+    url = f'https://{mode}fritz.science/api/observation'
+    data = {
+            "startDate":startdate,
+            "endDate":enddate,
+            # "localizationDateobs": dateobs,
+            "instrumentName":"ZTF",
+            "localizationName": gcnid,
+            "localizationCumprob": 0.9,
+            # "returnStatistics": True
+            }
+
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f'token {token}'
+    }
+    response = requests.request('GET', url, params=data, headers=headers)
+    return response.json()
 
 
 """
@@ -276,22 +321,29 @@ def generate_cadence_dates(date):
 def check_triggered_csv(superevent_id):
     df = pd.read_csv('./data/triggered_events.csv')
     triggered = superevent_id in df['superevent_id'].values
-    return triggered
+    if triggered:
+        trigger_plan_id = df[df['superevent_id'] == superevent_id]['observation_plan_id'].values[0]
+    else:
+        trigger_plan_id = None
+    return triggered, trigger_plan_id
 
-def update_valid_status(superevent_id_to_check, new_valid_status):
+def update_trigger_log(superevent_id_to_check, column, value):
     df = pd.read_csv('./data/triggered_events.csv')
-    df.loc[df['superevent_id'] == superevent_id_to_check, 'valid'] = new_valid_status
+    df.loc[df['superevent_id'] == superevent_id_to_check, column] = value
     df.to_csv('./data/triggered_events.csv', index=False)
 
-def update_triggercsv(superevent_id, dateobs, gcn_type, observation_plan_id, start_observation, trigger_cadence, valid):
+def add_triggercsv(superevent_id, dateobs, gcn_type, gcnid, localizationid, queued_plan, trigger_cadence, valid):
     # Create a DataFrame with the new event data
     new_event = pd.DataFrame([{
         'superevent_id': superevent_id,
         'dateobs': dateobs,
         'gcn_type': gcn_type,
-        'observation_plan_id': observation_plan_id,
-        'start_observation': start_observation,
+        'gcn_id': gcnid,
+        'localization_id': localizationid,
         'trigger_cadence': str(trigger_cadence),
+        'pending_observation': queued_plan,
+        'unsuccessful_observation': None,
+        'successful_observation': None,
         'valid': valid
     }])
 
@@ -311,11 +363,12 @@ def send_email(sender_email, sender_password, recipient_emails, subject, body):
 
         # Send the email to each recipient
         for recipient in recipient_emails:
+            # Create the email
             msg = MIMEMultipart()
             msg['From'] = sender_email
             msg['To'] = recipient
             msg['Subject'] = subject
-            msg.attach(MIMEText(body, 'html')) 
+            msg.attach(MIMEText(body, 'html'))  # Send as HTML
 
             server.sendmail(sender_email, recipient, msg.as_string())
 
@@ -323,6 +376,14 @@ def send_email(sender_email, sender_password, recipient_emails, subject, body):
     except Exception as e:
         print(f"Failed to send email: {e}")
     finally:
+        # Close the SMTP server connection
         server.quit()
 
-
+def send_trigger_email(credentials, subject_message, dateobs):
+    sender_email = credentials['sender_email']
+    sender_password = credentials['sender_password']
+    recipient_emails = credentials['recipient_emails']
+    subject = subject_message
+    fritz_url = f'https://fritz.science/gcn_events/{dateobs}'
+    body = f'<html><body><p>{fritz_url}</p></body></html>'
+    send_email(sender_email, sender_password, recipient_emails, subject, body)

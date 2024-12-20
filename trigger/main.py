@@ -57,7 +57,7 @@ while True:
                 skymap_name = params[11]
 
                 # open triggered_events.csv and check for superevent_id
-                triggered = check_triggered_csv(superevent_id)
+                triggered, trigger_plan_id = check_triggered_csv(superevent_id)
 
                 if (
                     superevent_id[0] != 'S' or
@@ -72,15 +72,17 @@ while True:
                     (alert_type == 'Preliminary' and skymap_name[-1] == 0)
                 ):
                     if triggered:
-                        update_valid_status(superevent_id, False)
+                        update_trigger_log(superevent_id, 'valid', False)
+                        delete_trigger_ztf(trigger_plan_id, fritz_token, mode)
                     raise MyException(f'{superevent_id} did not pass initial criteria') 
-                    
+
                 print(f'Processing {superevent_id}')
 
                 mass = m_total_mlp(MLP, distmean, far, dl_bns=168.)
                 if mass < 60:
                     if triggered:
-                        update_valid_status(superevent_id, False)
+                        update_trigger_log(superevent_id, 'valid', False)
+                        delete_trigger_ztf(trigger_plan_id, fritz_token, mode)
                     raise MyException(f'{superevent_id} did not pass mass criteria') 
                 
                 print(f'{superevent_id} passed mass criteria')
@@ -132,42 +134,48 @@ while True:
 
                 if total_time > 5400 or probability < 0.5:
                     if triggered:
-                        update_valid_status(superevent_id, False)
+                        update_trigger_log(superevent_id, 'valid', False)
+                        delete_trigger_ztf(trigger_plan_id, fritz_token, mode)
                     raise MyException(f'Plan for {superevent_id} with {total_time} seconds and {probability} probability does not meet criteria') 
                             
                 # future additon: check if ZTF will naturaly cover the skymap within +/- 1 day
-
-                if triggered or previous_trigger:
-                    # don't trigger ztf if we or another group have triggered on event
-                    # Future addition: retract old plan and send new one
-                    raise MyException(f'Already triggered on {superevent_id}') 
-                
                 if Time.now().mjd - mjd > 1:
                     # don't trigger on events older than 1 day
                     raise MyException(f'{superevent_id} is more than 1 day old') 
+
+                if previous_trigger:
+                    raise MyException(f'Another group triggered on {superevent_id}') 
                 
+                if triggered:
+                    if not check_before_sunset():
+                        raise MyException(f'Too late to update submitted trigger for {superevent_id}') 
+                    else:
+                        # remove current submitted plan so we can submit new one
+                        delete_trigger_ztf(trigger_plan_id, fritz_token, mode)
+
                 if testing:
                     print(f'Plan for {superevent_id} has {total_time} seconds and {probability} probability - would trigger ZTF')
                     raise MyException(f'Dont actually trigger {superevent_id} in testing mode') 
 
+                # check if ZTF survey naturaly covered the skymap previous nights
+                #NEED TO UPDATE THIS FUNCTION SO IT CHECKS NOT JUST FOR OBSERVATIONS BUT FOR SUFFICIENT % COVERAGE
+                startdate = (Time(dateobs) - TimeDelta(2, format='jd')).iso
+                observations = check_executed_observation(startdate, dateobs, gcnevent_id, fritz_token, mode)
+                if observations['data']['totalMatches'] >= 1:
+                    print(f'There is recent coverage of {superevent_id} - not triggering')  
+                    raise MyException(f'{superevent_id} has recent coverage')
+
                 # send plan to ZTF queue
-                ztf_token = credentials['ztf_token'] #fritz token has power for
                 trigger_ztf(observation_plan_id, fritz_token, mode)
                 
                 #write to triggered_events.csv
                 trigger_cadence = generate_cadence_dates(dateobs)
                 gcn_type = (alert_type, skymap_name)
+                queued_plan = (observation_plan_id, start_observation)
                 valid = True
-                update_triggercsv(superevent_id, dateobs, gcn_type, observation_plan_id, start_observation, trigger_cadence, valid)         
-
-                # send email
-                sender_email = credentials['sender_email']
-                sender_password = credentials['sender_password']
-                recipient_emails = credentials['recipient_emails']
-                subject = f'ZTF Triggered for {superevent_id}'
-                fritz_url = f'https://fritz.science/gcn_events/{dateobs}'
-                body = f'<html><body><p>{fritz_url}</p></body></html>'
-                send_email(sender_email, sender_password, recipient_emails, subject, body)
+                add_triggercsv(superevent_id, dateobs, gcn_type, gcnevent_id, localization_id, queued_plan, trigger_cadence, valid)         
+                message = f'ZTF Triggered for {superevent_id}'
+                send_trigger_email(credentials, message, dateobs)
 
                 time.sleep(120) # after triggering pause to avoid double triggers on quickly updated gcn
         
