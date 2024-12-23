@@ -14,7 +14,7 @@ The steps executed in [main](./main.py) go as follows:
 
 1. We begin consuming the GCN Kafka stream, listening for all LVC (LIGO) messages.
 
-2. When we have a message, we extract event details. We look for events that are superevents, have not been retracted, are significant, are CBC events, have probability BBH > 0.5 and probability terrestrial < 0.4, have a false alarm rate > 10, and have a 90% probability area > 1000 square degrees.
+2. When we have a message, we extract event details. We look for events that are superevents, have not been retracted, are significant, are CBC events, have probability BBH > 0.5 and probability terrestrial < 0.4, have a false alarm rate > 10 (yr^-1^), and have a 90% probability area < 1000 square deg^2^.
     - If these criteria aren't met, we stop here. We check if a previous GCN from this event prompted a trigger, and if it did we edit our file tracking triggers to indicate that the event is no longer viable.
     - We skip over the first preliminary notice for events, because the second preliminary notice tends to come within seconds and have significantly improved inference. Events notices are classified as preliminary, initial, and update.
 
