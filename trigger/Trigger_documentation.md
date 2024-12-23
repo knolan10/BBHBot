@@ -14,7 +14,7 @@ The steps executed in [main](./main.py) go as follows:
 
 1. We begin consuming the GCN Kafka stream, listening for all LVC (LIGO) messages.
 
-2. When we have a message, we extract event details. We look for events that are superevents, have not been retracted, are significant, are CBC events, have probability BBH > 0.5 and probability terrestrial < 0.4, have a false alarm rate > 10 (yr<sup>−1</sup>), and have a 90% probability area < 1000 square deg<sup>2</sup>.
+2. When we have a message, we extract event details. We look for events that are superevents, have not been retracted, are significant, are CBC events, have probability BBH > 0.5 and probability terrestrial < 0.4, have a false alarm rate > 10 (yr<sup>−1</sup>), and have a 90% probability area < 1000 (deg<sup>2</sup>).
 
     - If these criteria aren't met, we stop here. We check if a previous GCN from this event prompted a trigger, and if it did we edit our file tracking triggers to indicate that the event is no longer viable.
     - We skip over the first preliminary notice for events, because the second preliminary notice tends to come within seconds and have significantly improved inference. Events notices are classified as preliminary, initial, and update.
@@ -28,7 +28,7 @@ The steps executed in [main](./main.py) go as follows:
 
 6. We pause for 15 seconds, and then begin querying Fritz every 30 seconds up to 5 minutes to retrieve the generated observing plan.
 
-7. As an extra check, we retrieve the items in the ZTF queue for the upcoming night. We do a wordsearch for the `superevent_id` from Gracedb, for the `dateobs` which is used as an identifier on Fritz, and for the `gcnevent_id` assigned by Fritz. If we find any of these ids, we note that there has been a trigger by another group, and while we continue some more steps, we ultimately will not trigger.
+7. As an extra check, we retrieve the items in the ZTF queue for the upcoming night. We do a word search for the `superevent_id` from Gracedb, for the `dateobs` which is used as an identifier on Fritz, and for the `gcnevent_id` assigned by Fritz. If we find any of these ids, we note that there has been a trigger by another group, and while we continue some more steps, we ultimately will not trigger.
 
 8. We check if the plan has total_time < 5400 and probability > 0.5
     - If these criteria aren't met, we stop here, and indicate the event is no longer viable in our tracking file if necessary.
@@ -53,8 +53,8 @@ Status: code is written and currently being tested
 
 ## Technical Points
 - We use a Docker container to run this program. A persistent volume is used to store a file that records our triggers in the [data](./data) directory.
-- [mlp_model.sav](./mlp_model.sav) is trained on the known masses for LIGO O3 events, and used to predict masses in real time in order to select high-mass mergers for follow-up.
-- There is a "testing" bool set in the `trigger_credentials.yaml` file. If set to True, this will use the preview.fritz API, will prevent observation requests being actually sent to ZTF, and will not include all of the pauses built in designed to ensure smooth processing of real-time events.
+- [mlp_model.sav](./mlp_model.sav) is trained on the known masses for LIGO O3 events using scikit-learn, and used to predict masses in real time in order to select high-mass mergers for follow-up.
+- There is a "testing" bool set in the `trigger_credentials.yaml` file. If set to True, this will use the preview.fritz API, will prevent observation requests being actually sent to ZTF, and will not include all of the pauses designed to ensure smooth processing of real-time events.
 
 ## Credentials
 
