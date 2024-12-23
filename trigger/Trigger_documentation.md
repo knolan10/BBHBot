@@ -54,7 +54,7 @@ Status: code is written and currently being tested
 ## Technical Points
 - We use a Docker container to run this program. A persistent volume is used to store a file that records our triggers in the [data](./data) directory.
 - [mlp_model.sav](./mlp_model.sav) is trained on the known masses for LIGO O3 events using scikit-learn, and used to predict masses in real time in order to select high-mass mergers for follow-up.
-- There is a "testing" bool set in the `trigger_credentials.yaml` file. If set to True, this will use the preview.fritz API, will prevent observation requests being actually sent to ZTF, and will not include all of the pauses designed to ensure smooth processing of real-time events.
+- There is a "testing" bool set in the `trigger_credentials` file. If set to True, this will use the preview.fritz API, will prevent observation requests being actually sent to ZTF, and will not include all of the pauses designed to ensure smooth processing of real-time events.
 
 ## Credentials
 

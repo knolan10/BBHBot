@@ -15,7 +15,7 @@ Rather than running continuously, this script is automated to run once per day a
 
 1. Check if we submitting anything for obervation the previous night.
 
-- When we submit an automated request for observation (an initial TOO for a new event or a subsequent TOO for an event we have triggered), we add that event to the "pending" column of [triggered_events.csv](./data/triggered_events.csv), so we just check if there are any events there.
+- When we submit an automated request for observation (an initial TOO for a new event or a subsequent TOO for an event we have triggered), we add that event to the "pending" column of [triggered_events](./data/triggered_events.csv), so we just check if there are any events there.
 
 - For each pending observation, we check whether there were successful observations the previous night. If there were, we move the event into the "successful_observation" column. If there weren't but the event is fewer than two days old, we will request a plan for the upcoming night. If there weren't and the event is older than two days, we send an email notification and move the event into the "unsuccessful_observation" column.
 
@@ -28,7 +28,7 @@ Rather than running continuously, this script is automated to run once per day a
 - If we submit for observation, we add the event to the "pending" column if necessary and send an email notification.
 
 ## Technical Points
-- There is a "testing" bool set in the `trigger_credentials.yaml` file. If set to True, this will use the preview.fritz API, will prevent observation requests being actually sent to ZTF, and will not include all of the pauses built in designed to ensure smooth processing of real-time events.
+- There is a "testing" bool set in the `trigger_credentials` file. If set to True, this will use the preview.fritz API, will prevent observation requests being actually sent to ZTF, and will not include all of the pauses built in designed to ensure smooth processing of real-time events.
 
 ## Credentials
 
