@@ -4,7 +4,7 @@ import time
 import pickle
 from triggerfunctions import *
 
-with open('trigger_credentials.yaml', 'r') as file:
+with open('../credentials.yaml', 'r') as file:
     credentials = yaml.safe_load(file)
 testing = credentials['testing']
 

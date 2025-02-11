@@ -3,4 +3,6 @@ __pycache__/
 trigger/__pycache__/
 
 
-trigger/trigger_credentials.yaml
+credentials.yaml
+
+emfollowup/dicts
