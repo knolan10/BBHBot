@@ -2,9 +2,10 @@
 
 - [Introduction](#introduction)
 - [In Depth Description](#in-depth-description)
-- [Phase 2 Additions](#phase-2-additions)
-- [Technical Points](#technical-points)
+- [Command Line](#command-line)
 - [Credentials](#credentials)
+- [Dependencies](#dependencies)
+
 
 ## Introduction
 This is the code which automates the search for anomalous flares for merging binary black holes. The directory [flares](./flares.py) contains a lists of anomalous flares in g, r, and i bands for each event that has been processed.
@@ -16,7 +17,7 @@ This pipeline is broken into smaller steps in [emfollowup.ipynb](./emfollowup.ip
 
 The pipeline consists of [new_events.py](./new_events.py) &rarr; [photometry.py](./photometry.py) &rarr; [flares.py](./flares.py)
 
-[new_events.py](./new_events.py)
+### 1. [new_events.py](./new_events.py)
 
 This script checks GraceDB for new superevents that have not been processed and saved locally. 
 
@@ -24,9 +25,9 @@ It gathers information on the new events such as the ZTF trigger status (and whe
 
 It saves all of this information locally, and pushes to the public github repo [BBH](https://github.com/knolan10/BBH).
 
-[photometry.py](./photometry.py)
+### 2. [photometry.py](./photometry.py)
 
-[flares.py](./flares.py)
+### 3. [flares.py](./flares.py)
 
 ## Command Line
 
@@ -38,15 +39,15 @@ It saves all of this information locally, and pushes to the public github repo [
   - `fritz_token`
   - `allocation`
 
-  - **Kowalski**: 
+- **Kowalski**: 
   - `kowalski_password`
 
-  - **ZFPS (Forced Photometry Service)**: 
+- **ZFPS (Forced Photometry Service)**: 
   - `zfps_email`
   - `zfps_userpass`
   - `zfps_auth`
 
-  - **Github**: 
+- **Github**: 
   - `github_token`
 
 ## Dependencies
