@@ -7,6 +7,9 @@ from datetime import datetime
 from astropy.time import Time
 import requests
 import os
+import re
+import StringIO
+import io
 
 #credentials
 with open('../credentials.yaml', 'r') as file:
@@ -287,3 +290,117 @@ class GetPhotometry():
             print('submit in one batch')           
             self.submit_post()
         self.save_photometry_date()
+
+
+
+
+class SavePhotometry():
+    def __init__(self, graceid, batch_codes, action):
+        self.graceid = graceid
+        self.batch_codes = batch_codes
+        self.action = action
+
+    def get_photometry(self):
+        """
+        Check completion and return list URLs (only saved 30 days post request):
+        """
+        action = 'Query Database'
+        settings = {'email': email, 'userpass': userpass, 'option': 'All recent jobs', 'action': action}
+        # fixed IP address/URL where requests are submitted:
+        url = 'https://ztfweb.ipac.caltech.edu/cgi-bin/getBatchForcedPhotometryRequests.cgi'
+        r = requests.get(url, auth = (auth_username, auth_password), params = settings)
+        if r.status_code == 200:
+            print("Script executed normally and queried the ZTF Batch Forced Photometry database.\n")
+            url_prefix = 'https://ztfweb.ipac.caltech.edu'
+            lightcurves = re.findall(r'/ztf/ops.+?lc.txt\b', r.text)
+            if lightcurves is not None:
+                batch_url = [url_prefix + lc for lc in lightcurves]
+            else:
+                print("Status_code=",r.status_code,"; Jobs either queued or abnormal execution.")
+        batch_lightcurves = [lc for lc in batch_url if any(batch in lc for batch in self.batch_codes)]
+        print("Retrieved", len(batch_lightcurves), "lightcurves")
+        return batch_lightcurves
+    
+    def get_coords(self):
+        """
+        load zfps table, get coords, format filename
+        """
+        action = 'Query Database'
+        settings = {'email': email, 'userpass': userpass, 'option': 'All recent jobs', 'action': action}
+        # fixed IP address/URL where requests are submitted:
+        url = 'https://ztfweb.ipac.caltech.edu/cgi-bin/getBatchForcedPhotometryRequests.cgi'
+        r = requests.get(url, auth = (auth_username, auth_password), params = settings)
+        if r.status_code == 200:
+            print("Script executed normally and queried the ZTF Batch Forced Photometry database.\n")
+            html_content = StringIO(r.text)
+            full_table = pd.read_html(html_content)[0]
+            pattern = '|'.join(self.batch_codes)
+            table_gw = full_table[full_table['lightcurve'].str.contains(pattern, na=False)]
+            print (len(table_gw), 'coords found')
+            ra = table_gw['ra'].tolist()
+            dec = table_gw['dec'].tolist()
+            name = [str(r) + '_' + str(d) for r,d in zip(ra,dec)] 
+        return table_gw, name
+
+    def df_from_url (url, file):
+        """
+        load lightcurves from url
+        """
+        data = requests.get(url, auth = (auth_username, auth_password), data = {'email': email, 'userpass': userpass})
+        if data.status_code == 200:
+            df=pd.read_csv(io.StringIO(data.content.decode('utf-8')), sep=r'\s+', comment='#')
+            df.columns = df.columns.str.replace(',', '') 
+            return df, file
+    
+    def quality_cut_filter (df):
+        """
+        cut down lc dfs to required columns, recommended quality filtering 
+        """
+        df_qf = df[(df['infobitssci'] < 33554432) & (df['scisigpix'] < 25) & (df['sciinpseeing'] < 4) & (df['forcediffimflux'] > -99998)] 
+        df_qf_cut = df_qf[['dnearestrefsrc', 'zpdiff', 'nearestrefmag', 'nearestrefmagunc', 'forcediffimflux', 'forcediffimfluxunc','filter', 'jd']]
+        return(df_qf_cut)
+
+    def download_lightcurves (df, name):
+        """
+        Download lightcurve files to local directory
+        """
+        directory = '../../../data/bbh/ZFPS/'
+        save_as = f"{directory}{name}.gz" 
+        df.to_pickle(save_as, compression='gzip')
+
+    def load_event_lightcurves(filename):
+        """
+        if updating existing photometry
+        """
+        dir = '../../../data/bbh/ZFPS/'
+        df = [pd.read_pickle(dir + file + '.gz', compression='gzip') for file in filename if os.path.exists(dir + file + '.gz')]
+        coords = [file for file in filename if os.path.exists(dir + file + '.gz')]
+        return df, coords
+    
+    def save_photometry(self):
+        lightcurves = self.get_photometry() 
+        table, filename = self.get_coords()
+        result = [self.df_from_url(url, file) for url, file in zip(lightcurves, filename)]
+        errors = [x for x in result if x is None]
+        values = [x for x in result if x is not None]
+        print (len(errors), 'broken urls;', len(values), 'lightcurves returned')
+        lc_from_url, filename_updated = zip(*values)
+        lc_cut = [self.quality_cut_filter(df) for df in lc_from_url]
+        # if the photometry is an update to existing photometry, open existing df and append
+        if self.action == 'update':
+            batch_photometry_existing, radec_existing = self.load_event_lightcurves(filename_updated)
+            print(f'loaded {len(batch_photometry_existing)} existing AGN photometry for {len(lc_cut)} new AGN photometry')
+            for i in range(len(batch_photometry_existing)):
+                batch_photometry_existing[i] = pd.concat([batch_photometry_existing[i], lc_cut[i]]).drop_duplicates()
+            if len(batch_photometry_existing) == len(filename_updated):
+                [self.download_lightcurves(i,j) for i,j in zip(batch_photometry_existing, filename_updated)]
+                print('downloaded', len(batch_photometry_existing), 'lightcurves')
+            else:
+                print('Error: different number of lightcurves and filenames')   
+        # save the new photometry
+        else:
+            if len(lc_cut) == len(filename_updated):
+                [self.download_lightcurves(i,j) for i,j in zip(lc_cut, filename_updated)]
+                print('downloaded', len(lc_cut), 'lightcurves')
+            else:
+                print('Error: different number of lightcurves and filenames')  

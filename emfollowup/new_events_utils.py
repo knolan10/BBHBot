@@ -545,22 +545,22 @@ class PushEventsPublic():
         self.verbose = verbose
 
     def push_changes_to_repo(self):
-        repo_path = '../../BBH'
+        dir_path = '../events_summary'
         commit_message = 'automated push of new events'
         try:
-            remote_url = f'https://{self.github_token}@github.com/knolan10/BBH'
+            remote_url = f'https://{self.github_token}@github.com/knolan10/BBHBot/events_summary'
 
-            subprocess.run(['git', '-C', repo_path, 'remote', 'set-url', 'origin', remote_url], check=True)
+            subprocess.run(['git', '-C', dir_path, 'remote', 'set-url', 'origin', remote_url], check=True)
 
-            subprocess.run(['git', '-C', repo_path, 'add', '.'], check=True)
+            subprocess.run(['git', '-C', dir_path, 'add', '.'], check=True)
 
-            result = subprocess.run(['git', '-C', repo_path, 'status', '--porcelain'], capture_output=True, text=True)
+            result = subprocess.run(['git', '-C', dir_path, 'status', '--porcelain'], capture_output=True, text=True)
             if not result.stdout.strip():
                 print("No changes to commit. Pushing existing commits.")
             else:
-                subprocess.run(['git', '-C', repo_path, 'commit', '-m', commit_message], check=True)
+                subprocess.run(['git', '-C', dir_path, 'commit', '-m', commit_message], check=True)
 
-            subprocess.run(['git', '-C', repo_path, 'push', 'origin', 'main'], check=True)
+            subprocess.run(['git', '-C', dir_path, 'push', 'origin', 'main'], check=True)
             print("Changes pushed to the repository successfully.")
         except subprocess.CalledProcessError as e:
             print(f"An error occurred: {e}")
@@ -678,16 +678,16 @@ class PushEventsPublic():
         markdown_table_trigger = trigger_df.to_markdown(index=False)
         markdown_table_error_triggers = error_triggers.to_markdown(index=False)
         if self.push:
-            with open('../../BBH/O4b.md', 'w') as f:
+            with open('../events_summary/O4b.md', 'w') as f:
                 f.write(markdown_table_O4b)
 
-            with open('../../BBH/O4b_priority.md', 'w') as f:
+            with open('../events_summary/O4b_priority.md', 'w') as f:
                 f.write(markdown_table_O4b_priority)
 
-            with open('../../BBH/trigger.md', 'w') as f:
+            with open('../events_summary/trigger.md', 'w') as f:
                 f.write(markdown_table_trigger)
 
-            with open('../../BBH/error_trigger.md', 'w') as f:
+            with open('../events_summary/error_trigger.md', 'w') as f:
                 f.write(markdown_table_error_triggers)
 
             self.push_changes_to_repo()
