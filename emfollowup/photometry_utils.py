@@ -8,8 +8,10 @@ from astropy.time import Time
 import requests
 import os
 import re
-import StringIO
+from io import StringIO
 import io
+import seaborn as sns
+import matplotlib.pyplot as plt 
 
 #credentials
 with open('../credentials.yaml', 'r') as file:
@@ -376,8 +378,8 @@ class SavePhotometry():
         df = [pd.read_pickle(dir + file + '.gz', compression='gzip') for file in filename if os.path.exists(dir + file + '.gz')]
         coords = [file for file in filename if os.path.exists(dir + file + '.gz')]
         return df, coords
-    
-    def save_photometry(self):
+
+    def get_batch_photometry(self): 
         lightcurves = self.get_photometry() 
         table, filename = self.get_coords()
         result = [self.df_from_url(url, file) for url, file in zip(lightcurves, filename)]
@@ -404,3 +406,46 @@ class SavePhotometry():
                 print('downloaded', len(lc_cut), 'lightcurves')
             else:
                 print('Error: different number of lightcurves and filenames')  
+
+
+
+class PlotPhotometry():
+    def __init__(self, graceid):
+        self.graceid = graceid
+
+    def load_event_lightcurves_graceid(self):
+        coords = crossmatch_dict[self.graceid]['agn_catnorth']
+        name = [str(x['ra']) + '_' + str(x['dec']) for x in coords]
+        dir = '../../../data/bbh/ZFPS/'
+        df = [pd.read_pickle(dir + file + '.gz', compression='gzip') for file in name if os.path.exists(dir + file + '.gz')]
+        coords = [file for file in name if os.path.exists(dir + file + '.gz')]
+        return df
+
+    def plot_photometry_dates(self):
+        batch_photometry_filtered = self.load_event_lightcurves_graceid()
+        empty=[x for x in batch_photometry_filtered if x.empty]
+        total_matches=events_dict[self.graceid]['crossmatch']['n_agn_catnorth']
+        dateobs=events_dict[self.graceid]['gw']['GW MJD']+ 2400000.5
+        print(f'{len(empty)} / {len(batch_photometry_filtered)} dataframes for {total_matches} Catnorth sources are empty')
+        jd_min = [x['jd'].min() for x in batch_photometry_filtered]
+        jd_max = [x['jd'].max() for x in batch_photometry_filtered]
+        # Create a DataFrame for plotting
+        data = pd.DataFrame({
+            'JD Type': ['Min'] * len(jd_min) + ['Max'] * len(jd_max),
+            'JD Value': jd_min + jd_max
+        })
+        # Create the violin plot
+        plt.figure(figsize=(10, 6))
+        sns.violinplot(x='JD Type', y='JD Value', data=data)
+        plt.title('Distribution of JD Minimum and Maximum Values')
+        plt.xlabel('Min and Max photometry values')
+        plt.ylabel('JD')
+        # Add a horizontal line labeled "GW"
+        plt.axhline(y=dateobs, color='r', linestyle='--')
+        plt.text(0.4, dateobs, 'GW', color='r', ha='center', va='bottom')
+        plt.axhline(y=dateobs - 2*360, color='b', linestyle='--')
+        plt.text(0.5, dateobs - 2*360, 'Baseline', color='b', ha='center', va='bottom')
+        current_jd = Time.now().jd
+        plt.axhline(y=current_jd, color='g', linestyle='--')
+        plt.text(0.6, current_jd, 'Now', color='g', ha='center', va='bottom')
+        plt.show()

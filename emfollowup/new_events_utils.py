@@ -30,6 +30,14 @@ from ligo.gracedb.rest import GraceDb
 g = GraceDb()  
 from penquins import Kowalski
 
+#credentials
+with open('../credentials.yaml', 'r') as file:
+    credentials = yaml.safe_load(file)
+kowalski_password = credentials['kowalski_password']
+fritz_token = credentials['fritz_token']    
+allocation = credentials['allocation']  
+
+
 class Gracedb:
     # todo : cut unused params returned
     # todo : add a date to the gracedb query so we aren't getting all of 04b
@@ -163,18 +171,16 @@ class Gracedb:
         return [list(i)+list(j)+[k] for i,j,k in zip(params, skymap_data, mass)]
 
 class Fritz():
-    def __init__(self, eventid, dateid, a90, far, mass, allocation_id, fritz_token):
+    def __init__(self, eventid, dateid, a90, far, mass):
         self.eventid = eventid
         self.dateid = dateid
         self.a90 = a90
         self.far = far
         self.mass = mass    
-        self.allocation_id = allocation_id
-        self.fritz_token = fritz_token
 
-    def query_fritz_observation_plans(self, allocation_id, token):
+    def query_fritz_observation_plans(self, allocation, token):
         headers = {'Authorization': f'token {token}'}
-        endpoint = f'https://fritz.science/api/allocation/observation_plans/{allocation_id}?numPerPage=1000'
+        endpoint = f'https://fritz.science/api/allocation/observation_plans/{allocation}?numPerPage=1000'
         response = requests.request('GET', endpoint, headers=headers)
         if response.status_code == 200:
             json_string = response.content.decode('utf-8')
@@ -268,7 +274,7 @@ class Fritz():
                     return ['correct','not triggered', total_time, probability, start]
         
     def get_trigger_status(self):    
-        plans = self.query_fritz_observation_plans(self.allocation_id, self.fritz_token)
+        plans = self.query_fritz_observation_plans(allocation, fritz_token)
         observation_plan_requests = plans['data']['observation_plan_requests']
         print(f'There are currently {plans['data']['totalMatches']} observation plans generated')
         trigger_status = [self.determine_trigger_status(observation_plan_requests, i, j, a, f, m) 
@@ -387,8 +393,7 @@ class NewEventsToDict():
 
 
 class KowalskiCrossmatch():
-    def __init__(self, kowalski_password, localization_name, skymap_str, dateobs, zmin, zmax, contour=90, mindec=-90): 
-        self.kowalski_password = kowalski_password
+    def __init__(self, localization_name, skymap_str, dateobs, zmin, zmax, contour=90, mindec=-90): 
         self.localization_name = localization_name
         self.skymap_str = skymap_str
         self.dateobs = dateobs
