@@ -1,9 +1,10 @@
 __pycache__/
-trigger/__pycache__/
+TriggerBot/__pycache__/
+TriggerBot/bot/__pycache__/
 FlareBot/__pycache__/
 FlareBot/bot/__pycache__/
 
-trigger/TriggerCredentials.yaml
-Flarebot/bot/FlareBotCredentials.yaml
+TriggerBot/bot/TriggerCredentials.yaml
+FlareBot/bot/FlareBotCredentials.yaml
 
-Flarebot/bot/data/dicts
+FlareBot/bot/data/dicts
