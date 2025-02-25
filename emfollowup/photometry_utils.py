@@ -27,14 +27,12 @@ class PhotometryStatus:
         self.observing_run = observing_run
 
     def show_status(self):
-        if self.observing_run == 'O4b':
-            with open('./dicts/events_dict_O4b.json', 'r') as file:
+        try:
+            with open(f'./dicts/events_dict_{self.observing_run}.json', 'r') as file:
                 events_dict = json.load(file)
-        elif self.observing_run == 'O4a':
-            with open('./dicts/events_dict_O4a.json', 'r') as file:
-                events_dict = json.load(file)
-        else:
+        except:
             print('observing_run must be O4a or O4b')
+            return
         # make this automatic
         trigger_list = ['S240919bn', 'S240923ct', 'S241006k', 'S241009em', 'S241114y']
         good_events = [key for key, value in events_dict.items() if value['gw']['Mass (M_sol)'] > 60 
