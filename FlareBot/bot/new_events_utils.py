@@ -31,8 +31,9 @@ g = GraceDb()
 from penquins import Kowalski
 
 #credentials
-with open('../credentials.yaml', 'r') as file:
+with open('./FlareBotCredentials.yaml', 'r') as file:
     credentials = yaml.safe_load(file)
+github_token = credentials['github_token']
 kowalski_password = credentials['kowalski_password']
 fritz_token = credentials['fritz_token']    
 allocation = credentials['allocation']  
@@ -150,7 +151,7 @@ class Gracedb:
         print(len(graceids_all), 'significant superevents in O4b')
         responses = [g.superevent(id) for id in graceids_all]
         data_all = [r.json() for r in responses]
-        with open('dicts/events_dict_O4b.json', 'r') as file:
+        with open('data/dicts/events_dict_O4b.json', 'r') as file:
             events_dict_add = json.load(file)
         new_events = [(i, j) for i, j in zip(graceids_all, data_all) if i not in list(events_dict_add.keys())]
         graceids = [x[0] for x in new_events]
@@ -165,7 +166,7 @@ class Gracedb:
         # mass
         dist = [x[0] for x in skymap_data]
         far = [x[9] for x in params]
-        modelpath = '../trigger/mlp_model.sav'
+        modelpath = './mlp_model.sav' # todo : dont duplicate model?
         MLP = pickle.load(open(modelpath, 'rb'))
         mass = [self.m_total_mlp(MLP, d, f, dl_bns=168.) for d, f in zip(dist, far)]
         return [list(i)+list(j)+[k] for i,j,k in zip(params, skymap_data, mass)]
@@ -353,7 +354,7 @@ class NewEventsToDict():
         df_for_dict = new_events_df.drop(columns=['plan time', 'plan probability', 'plan start', 'cadence'])
         new_events_dict = df_for_dict.to_dict(orient='index')
 
-        with open('dicts/events_dict_O4b.json', 'r') as file:
+        with open('data/dicts/events_dict_O4b.json', 'r') as file:
             events_dict_add = json.load(file)
 
         # add any new events to saved dict
@@ -380,13 +381,13 @@ class NewEventsToDict():
         if not self.check_before_run:
             save = input("Save dictionary with new events added? (yes/no): ").strip().lower()
             if save == 'yes':
-                with open('dicts/events_dict_O4b.json', 'w') as file:
+                with open('data/dicts/events_dict_O4b.json', 'w') as file:
                     json.dump(events_dict_add, file)
                 print("New events saved to dictionary.")
             else:
                 print("New events not saved.") 
         else: # save automatically
-            with open('dicts/events_dict_O4b.json', 'w') as file:
+            with open('data/dicts/events_dict_O4b.json', 'w') as file:
                 json.dump(events_dict_add, file)
             print("New events saved to dictionary.")
         return new_events_df
@@ -403,7 +404,7 @@ class KowalskiCrossmatch():
         self.contour = contour
         self.kowalski = self.connect_kowalski(kowalski_password)
 
-    def connect_kowalski(self, kowalski_password):
+    def connect_kowalski(self):
         instances = {
             "kowalski": {
                 "name": "kowalski",
@@ -428,7 +429,7 @@ class KowalskiCrossmatch():
         return kowalski
 
     def check_events_to_crossmatch(self):
-        with open('dicts/events_dict_O4b.json', 'r') as file:
+        with open('data/dicts/events_dict_O4b.json', 'r') as file:
             events_dict_add = json.load(file)
         do_crossmatch = [key for key, value in events_dict_add.items() if not value['crossmatch']]
         print(f'{len(do_crossmatch)} events are missing crossmatch: {do_crossmatch}')
@@ -516,7 +517,7 @@ class KowalskiCrossmatch():
                     for l,d,zn,zx in zip(localization_name, date, zmin, zmax)]
         # save coords for catnorth crossmatch
         crossmatch_dict = {id: {'agn_catnorth': coords} for id, coords in zip(localization_name, catnorth)}
-        with gzip.open('dicts/crossmatch_dict_O4b.gz', 'rb') as f:
+        with gzip.open('data/dicts/crossmatch_dict_O4b.gz', 'rb') as f:
             crossmatch_dict_add = pickle.load(f)
         for key, value in crossmatch_dict.items():
             if key not in crossmatch_dict_add:
@@ -524,18 +525,18 @@ class KowalskiCrossmatch():
                 print (key, 'added')
             else:
                 print(key, 'already in dictionary')
-        with gzip.open('dicts/crossmatch_dict_O4b.gz', 'wb') as f:
+        with gzip.open('data/dicts/crossmatch_dict_O4b.gz', 'wb') as f:
             f.write(pickle.dumps(crossmatch_dict_add))
         # save stats on crossmatch
         crossmatch_dict_stats = {id: {'n_agn_catnorth': len(c), 'n_agn_quaia': len(q)} for id, c, q in zip(localization_name, catnorth, quaia)}
-        with open('dicts/events_dict_O4b.json', 'r') as file:
+        with open('data/dicts/events_dict_O4b.json', 'r') as file:
             events_dict_add = json.load(file)
         for key, value in crossmatch_dict_stats.items():
             if key in events_dict_add:
                 events_dict_add[key]['crossmatch'] = value
             else:
                 print(key, 'not in dictionary')
-        with open('dicts/events_dict_O4b.json', 'w') as file:
+        with open('data/dicts/events_dict_O4b.json', 'w') as file:
             json.dump(events_dict_add, file)
 
         [self.delete_skymaps(kowalski, d, l, 'gloria') for d, l in zip(date, localization_name)]
@@ -544,16 +545,15 @@ class KowalskiCrossmatch():
         return catnorth, quaia
 
 class PushEventsPublic():
-    def __init__(self, github_token, push=False, verbose=True): 
-        self.github_token = github_token
+    def __init__(self, push=False, verbose=True): 
         self.push = push
         self.verbose = verbose
 
     def push_changes_to_repo(self):
-        dir_path = '../events_summary'
+        dir_path = '../../events_summary'
         commit_message = 'automated push of new events'
         try:
-            remote_url = f'https://{self.github_token}@github.com/knolan10/BBHBot/events_summary'
+            remote_url = f'https://{github_token}@github.com/knolan10/BBHBot/events_summary'
 
             subprocess.run(['git', '-C', dir_path, 'remote', 'set-url', 'origin', remote_url], check=True)
 
@@ -590,7 +590,7 @@ class PushEventsPublic():
         plt.show()
 
     def format_and_push(self):
-        with open('dicts/events_dict_O4b.json', 'r') as file:
+        with open('data/dicts/events_dict_O4b.json', 'r') as file:
             events_dict_add = json.load(file)
         # convert back to df
         restructured_dict = {key: {'graceids': key, **value['gw']} for key, value in events_dict_add.items()}
@@ -683,16 +683,16 @@ class PushEventsPublic():
         markdown_table_trigger = trigger_df.to_markdown(index=False)
         markdown_table_error_triggers = error_triggers.to_markdown(index=False)
         if self.push:
-            with open('../events_summary/O4b.md', 'w') as f:
+            with open('../../events_summary/O4b.md', 'w') as f:
                 f.write(markdown_table_O4b)
 
-            with open('../events_summary/O4b_priority.md', 'w') as f:
+            with open('../../events_summary/O4b_priority.md', 'w') as f:
                 f.write(markdown_table_O4b_priority)
 
-            with open('../events_summary/trigger.md', 'w') as f:
+            with open('../../events_summary/trigger.md', 'w') as f:
                 f.write(markdown_table_trigger)
 
-            with open('../events_summary/error_trigger.md', 'w') as f:
+            with open('../../events_summary/error_trigger.md', 'w') as f:
                 f.write(markdown_table_error_triggers)
 
             self.push_changes_to_repo()

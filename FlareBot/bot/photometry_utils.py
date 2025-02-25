@@ -14,7 +14,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt 
 
 #credentials
-with open('../credentials.yaml', 'r') as file:
+with open('./FlareBotCredentials.yaml', 'r') as file:
     credentials = yaml.safe_load(file)
 email = credentials['zfps_email']
 userpass = credentials['zfps_userpass']
@@ -22,9 +22,9 @@ auth_username = credentials['zfps_auth']['username']
 auth_password = credentials['zfps_auth']['password']
 
 # open the stored event info
-with gzip.open('dicts/crossmatch_dict_O4b.gz', 'rb') as f:
+with gzip.open('data/dicts/crossmatch_dict_O4b.gz', 'rb') as f:
     crossmatch_dict = pickle.load(f)
-with open('dicts/events_dict_O4b.json', 'r') as file:
+with open('data/dicts/events_dict_O4b.json', 'r') as file:
     events_dict = json.load(file)
 
 class PhotometryStatus:
@@ -33,7 +33,7 @@ class PhotometryStatus:
 
     def show_status(self):
         try:
-            with open(f'./dicts/events_dict_{self.observing_run}.json', 'r') as file:
+            with open(f'data/dicts/events_dict_{self.observing_run}.json', 'r') as file:
                 events_dict = json.load(file)
         except:
             print('observing_run must be O4a or O4b')
@@ -104,7 +104,7 @@ class PhotometryCoords():
             print (f'about {len(ztf_coords)} / {len(all_coords)} coords should be in ZTF footprint')
             return ztf_coords, two_year_baseline
         names = [str(x['ra']) + '_' + str(x['dec']) for x in ztf_coords]
-        path = '../../../data/bbh/ZFPS/' #path to where photometry is stored locally
+        path = '../../../../data/bbh/ZFPS/' #path to where photometry is stored locally
         if self.action == 'new':
             new_coords = [coords for coords,name in zip(ztf_coords, names) if not os.path.exists(path + name + '.gz')]
             print (f'{len(new_coords)} / {len(all_coords)} total coords dont have photometry')
@@ -189,7 +189,7 @@ class PhotometryCoords():
         elif len(coords) == 0:   
             print('no AGN to submit')
             events_dict[self.graceid]['flare'] = {'date_last_zfps': 'no AGN observable by ZTF'}
-            with open('dicts/events_dict_O4b.json', 'w') as file:
+            with open('data/dicts/events_dict_O4b.json', 'w') as file:
                 json.dump(events_dict, file) 
             return
         elif len(coords) <= 1500:
@@ -277,7 +277,7 @@ class GetPhotometry():
                 if 'flare' not in events_dict[key]:
                     events_dict[key]['flare'] = {}  
                 events_dict[key]['flare']['date_last_zfps'] = value
-                with open('dicts/events_dict_O4b.json', 'w') as file:
+                with open('data/dicts/events_dict_O4b.json', 'w') as file:
                     json.dump(events_dict, file)
             else:
                 print(f'{key} not in dictionary')
@@ -366,7 +366,7 @@ class SavePhotometry():
         """
         Download lightcurve files to local directory
         """
-        directory = '../../../data/bbh/ZFPS/'
+        directory = '../../../../data/bbh/ZFPS/'
         save_as = f"{directory}{name}.gz" 
         df.to_pickle(save_as, compression='gzip')
 
@@ -374,7 +374,7 @@ class SavePhotometry():
         """
         if updating existing photometry
         """
-        dir = '../../../data/bbh/ZFPS/'
+        dir = '../../../../data/bbh/ZFPS/'
         df = [pd.read_pickle(dir + file + '.gz', compression='gzip') for file in filename if os.path.exists(dir + file + '.gz')]
         coords = [file for file in filename if os.path.exists(dir + file + '.gz')]
         return df, coords
@@ -416,7 +416,7 @@ class PlotPhotometry():
     def load_event_lightcurves_graceid(self):
         coords = crossmatch_dict[self.graceid]['agn_catnorth']
         name = [str(x['ra']) + '_' + str(x['dec']) for x in coords]
-        dir = '../../../data/bbh/ZFPS/'
+        dir = '../../../../data/bbh/ZFPS/'
         df = [pd.read_pickle(dir + file + '.gz', compression='gzip') for file in name if os.path.exists(dir + file + '.gz')]
         coords = [file for file in name if os.path.exists(dir + file + '.gz')]
         return df

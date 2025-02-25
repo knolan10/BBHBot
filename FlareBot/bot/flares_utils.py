@@ -11,9 +11,9 @@ import math
 from astropy.time import Time
 
 # open the stored event info
-with gzip.open('dicts/crossmatch_dict_O4b.gz', 'rb') as f:
+with gzip.open('data/dicts/crossmatch_dict_O4b.gz', 'rb') as f:
     crossmatch_dict = pickle.load(f)
-with open('dicts/events_dict_O4b.json', 'r') as file:
+with open('data/dicts/events_dict_O4b.json', 'r') as file:
     events_dict = json.load(file)
 
 class FlarePreprocessing():
@@ -23,7 +23,7 @@ class FlarePreprocessing():
     def load_event_lightcurves(self):
         coords = crossmatch_dict[self.graceid]['agn_catnorth']
         name = [str(x['ra']) + '_' + str(x['dec']) for x in coords]
-        path = '../../../data/bbh/ZFPS/'
+        path = '../../../../data/bbh/ZFPS/'
         df = [pd.read_pickle(path + file + '.gz', compression='gzip') for file in name if os.path.exists(path + file + '.gz')]
         coords = [file for file in name if os.path.exists(path + file + '.gz')]
         return df, coords
@@ -212,7 +212,7 @@ class RollingWindowHeuristic:
                                             'number_g': len(g), 'number_r': len(r),'number_i': len(i),
                                             'coords_g': flare_coords_g, 'coords_r': flare_coords_r, 'coords_i': flare_coords_i,}}
 
-            with open('dicts/events_dict_O4b.json', 'r') as file:
+            with open('data/dicts/events_dict_O4b.json', 'r') as file:
                 events_dict_add = json.load(file)
 
             # add new values to flare key without replacing existing values
@@ -222,7 +222,7 @@ class RollingWindowHeuristic:
                         events_dict_add[key]['flare'].update(value)
                     else:
                         events_dict_add[key]['flare'] = value
-            with open('dicts/events_dict_O4b.json', 'w') as file:
+            with open('data/dicts/events_dict_O4b.json', 'w') as file:
                 json.dump(events_dict_add, file)
             
             # publish to public repo

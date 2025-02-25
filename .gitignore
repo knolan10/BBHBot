@@ -1,8 +1,9 @@
-
 __pycache__/
 trigger/__pycache__/
+FlareBot/__pycache__/
+FlareBot/bot/__pycache__/
 
+trigger/TriggerCredentials.yaml
+Flarebot/bot/FlareBotCredentials.yaml
 
-credentials.yaml
-
-emfollowup/dicts
+Flarebot/bot/data/dicts
