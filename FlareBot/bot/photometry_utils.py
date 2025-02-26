@@ -14,26 +14,21 @@ import seaborn as sns
 import matplotlib.pyplot as plt 
 
 #credentials
-with open('./FlareBotCredentials.yaml', 'r') as file:
+with open('bot/FlareBotCredentials.yaml', 'r') as file:
     credentials = yaml.safe_load(file)
 email = credentials['zfps_email']
 userpass = credentials['zfps_userpass']
 auth_username = credentials['zfps_auth']['username']
 auth_password = credentials['zfps_auth']['password']
 
-# open the stored event info
-with gzip.open('data/dicts/crossmatch_dict_O4b.gz', 'rb') as f:
-    crossmatch_dict = pickle.load(f)
-with open('data/dicts/events_dict_O4b.json', 'r') as file:
-    events_dict = json.load(file)
-
 class PhotometryStatus:
-    def __init__(self, observing_run):
+    def __init__(self, observing_run, path_events_dictionary):
         self.observing_run = observing_run
+        self.path_events_dictionary = path_events_dictionary    
 
     def show_status(self):
         try:
-            with open(f'data/dicts/events_dict_{self.observing_run}.json', 'r') as file:
+            with open(f'{self.path_events_dictionary}/dicts/events_dict_{self.observing_run}.json', 'r') as file:
                 events_dict = json.load(file)
         except:
             print('observing_run must be O4a or O4b')
@@ -77,11 +72,13 @@ class PhotometryStatus:
         return zfps_status_df
 
 class PhotometryCoords():
-    def __init__(self, action, graceid, catalog, verbose):
+    def __init__(self, action, graceid, catalog, verbose, path_events_dictionary, path_photometry):
         self.action = action
         self.graceid = graceid
         self.catalog = catalog
         self.verbose = verbose
+        self.path_events_dictionary = path_events_dictionary
+        self.path_photometry = path_photometry
 
     def get_agn_coords(self):
         """"
@@ -89,6 +86,11 @@ class PhotometryCoords():
         Depending on action variable, will get all coords, only coords we have no photometry, or coords and dates to update photometry
         input: graceid (string), catalog (list of string names of catalogs), action ('all', 'new', 'update') 
         """
+        # open the stored event info
+        with gzip.open(f'{self.path_events_dictionary}/dicts/crossmatch_dict_O4b.gz', 'rb') as f:
+            crossmatch_dict = pickle.load(f)
+        with open(f'{self.path_events_dictionary}/dicts/events_dict_O4b.json', 'r') as file:
+            events_dict = json.load(file)
         coords_catnorth = []
         coords_quaia = []
         if 'catnorth' in self.catalog:
@@ -104,7 +106,7 @@ class PhotometryCoords():
             print (f'about {len(ztf_coords)} / {len(all_coords)} coords should be in ZTF footprint')
             return ztf_coords, two_year_baseline
         names = [str(x['ra']) + '_' + str(x['dec']) for x in ztf_coords]
-        path = '../../../../data/bbh/ZFPS/' #path to where photometry is stored locally
+        path = self.path_photometry #path to where photometry is stored locally
         if self.action == 'new':
             new_coords = [coords for coords,name in zip(ztf_coords, names) if not os.path.exists(path + name + '.gz')]
             print (f'{len(new_coords)} / {len(all_coords)} total coords dont have photometry')
@@ -181,6 +183,8 @@ class PhotometryCoords():
         """
         get formatting and batching for ZFPS submission
         """
+        with open(f'{self.path_events_dictionary}/dicts/events_dict_O4b.json', 'r') as file:
+            events_dict = json.load(file)
         ra = [val['ra'] for val in coords]
         dec = [val['dec'] for val in coords]
         if len(coords) > 15000:
@@ -189,7 +193,7 @@ class PhotometryCoords():
         elif len(coords) == 0:   
             print('no AGN to submit')
             events_dict[self.graceid]['flare'] = {'date_last_zfps': 'no AGN observable by ZTF'}
-            with open('data/dicts/events_dict_O4b.json', 'w') as file:
+            with open(f'{self.path_events_dictionary}/dicts/events_dict_O4b.json', 'w') as file:
                 json.dump(events_dict, file) 
             return
         elif len(coords) <= 1500:
@@ -247,11 +251,12 @@ class PhotometryCoords():
 
 
 class GetPhotometry():
-    def __init__(self, graceid, ra, dec, jd):
+    def __init__(self, graceid, ra, dec, jd, path_events_dictionary):
         self.graceid = graceid
         self.ra = ra
         self.dec = dec
         self.jd = jd
+        self.path_events_dictionary = path_events_dictionary
 
     def submit_post(self):
         ra = json.dumps(self.ra)
@@ -268,6 +273,7 @@ class GetPhotometry():
             print(f'Error: {r.text}')
 
     def save_photometry_date(self):
+
         if len(self.ra) == 0:
             zfps_date_dict = {self.graceid: 'NA'}  
         else:    
@@ -277,7 +283,7 @@ class GetPhotometry():
                 if 'flare' not in events_dict[key]:
                     events_dict[key]['flare'] = {}  
                 events_dict[key]['flare']['date_last_zfps'] = value
-                with open('data/dicts/events_dict_O4b.json', 'w') as file:
+                with open(f'{self.path_events_dictionary}/dicts/events_dict_O4b.json', 'w') as file:
                     json.dump(events_dict, file)
             else:
                 print(f'{key} not in dictionary')
@@ -297,10 +303,11 @@ class GetPhotometry():
 
 
 class SavePhotometry():
-    def __init__(self, graceid, batch_codes, action):
+    def __init__(self, graceid, batch_codes, action, path_photometry):
         self.graceid = graceid
         self.batch_codes = batch_codes
         self.action = action
+        self.path_photometry = path_photometry
 
     def get_photometry(self):
         """
@@ -366,7 +373,7 @@ class SavePhotometry():
         """
         Download lightcurve files to local directory
         """
-        directory = '../../../../data/bbh/ZFPS/'
+        directory = self.path_photometry
         save_as = f"{directory}{name}.gz" 
         df.to_pickle(save_as, compression='gzip')
 
@@ -374,7 +381,7 @@ class SavePhotometry():
         """
         if updating existing photometry
         """
-        dir = '../../../../data/bbh/ZFPS/'
+        dir = self.path_photometry
         df = [pd.read_pickle(dir + file + '.gz', compression='gzip') for file in filename if os.path.exists(dir + file + '.gz')]
         coords = [file for file in filename if os.path.exists(dir + file + '.gz')]
         return df, coords
@@ -410,13 +417,18 @@ class SavePhotometry():
 
 
 class PlotPhotometry():
-    def __init__(self, graceid):
+    def __init__(self, graceid, path_events_dictionary, path_photometry):
         self.graceid = graceid
+        self.path_events_dictionary = path_events_dictionary
+        self.path_photometry = path_photometry
 
     def load_event_lightcurves_graceid(self):
+        # open the stored event info
+        with gzip.open(f'{self.path_events_dictionary}/dicts/crossmatch_dict_O4b.gz', 'rb') as f:
+            crossmatch_dict = pickle.load(f)
         coords = crossmatch_dict[self.graceid]['agn_catnorth']
         name = [str(x['ra']) + '_' + str(x['dec']) for x in coords]
-        dir = '../../../../data/bbh/ZFPS/'
+        dir = self.path_photometry
         df = [pd.read_pickle(dir + file + '.gz', compression='gzip') for file in name if os.path.exists(dir + file + '.gz')]
         coords = [file for file in name if os.path.exists(dir + file + '.gz')]
         return df
@@ -424,6 +436,9 @@ class PlotPhotometry():
     def plot_photometry_dates(self):
         batch_photometry_filtered = self.load_event_lightcurves_graceid()
         empty=[x for x in batch_photometry_filtered if x.empty]
+        # open the stored event info
+        with open(f'{self.path_events_dictionary}/dicts/events_dict_O4b.json', 'r') as file:
+            events_dict = json.load(file)
         total_matches=events_dict[self.graceid]['crossmatch']['n_agn_catnorth']
         dateobs=events_dict[self.graceid]['gw']['GW MJD']+ 2400000.5
         print(f'{len(empty)} / {len(batch_photometry_filtered)} dataframes for {total_matches} Catnorth sources are empty')
