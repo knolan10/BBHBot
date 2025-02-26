@@ -25,7 +25,7 @@ This script checks GraceDB for new superevents that have not been processed and 
 
 It gathers information on the new events such as the ZTF trigger status (and whether that matches the intended status), makes calculations such as an estimated total merger mass, and does AGN catalog crossmatches. 
 
-It saves all of this information locally, and pushes to the public github repo [BBH](https://github.com/knolan10/BBH).
+It saves all of this information locally, and pushes to the directory [events_summary](../events_summary/).
 
 ### 2. [photometry.py](./photometry.py)
 
