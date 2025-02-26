@@ -8,7 +8,7 @@
 
 
 ## Introduction
-This is the code which automates the search for anomalous flares for merging binary black holes. The directory [flares](bot/data/flares.py) contains a lists of ra_dec for anomalous flares in g, r, and i bands for each event that has been processed.
+This is the code which automates the search for anomalous flares for merging binary black holes. The directory [flares](bot/data/flares) contains a lists of ra_dec for anomalous flares in g, r, and i bands for each event that has been processed.
 
 Note - this code depends on various credentials and interacts with private local files.
 
