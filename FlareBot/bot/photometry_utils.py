@@ -233,6 +233,7 @@ class PhotometryCoords():
         
     def get_photometry_coords(self):
         coords, date = self.get_agn_coords()
+        num_agn = len(coords)
         if self.action == 'update':
             grouped_dates, grouped_coords = self.custom_update_batching(coords, date)
             formatted = [self.format_for_zfps(i,j) for i,j in zip(grouped_coords, grouped_dates)]
@@ -246,8 +247,42 @@ class PhotometryCoords():
         else:
             ra,dec,jd = self.format_for_zfps(coords, date)
         ra,dec = self.replace_scientific_notation(ra, dec)
-        return ra, dec, jd
+        return ra, dec, jd, num_agn
     
+    def queue_photometry(id, ra, dec, jd, number_to_submit, action, path_queued_photometry):
+        """
+        If we are at request limit, save for later submission
+        """
+        file_path = os.path.join(path_queued_photometry, f"{id}.json")
+        data = {
+            "ra": ra,
+            "dec": dec,
+            "jd": jd,
+            "number_to_submit": number_to_submit,
+            "action": action
+        }
+        with open(file_path, 'w') as file:
+            json.dump(data, file, indent=4)
+
+    def retrieve_queue_photometry(path_queued_photometry):
+        """
+        Retrieve id, ra, dec, jd for all queued requests
+        """
+        photometry_data = []
+        
+        for file_name in os.listdir(path_queued_photometry):
+            if file_name.endswith('.json'):
+                file_path = os.path.join(path_queued_photometry, file_name)
+                with open(file_path, 'r') as file:
+                    data = json.load(file)
+                    id = os.path.splitext(file_name)[0]
+                    ra = data.get("ra")
+                    dec = data.get("dec")
+                    jd = data.get("jd")
+                    number_to_submit = data.get("number_to_submit")
+                    action = data.get("action")
+                    photometry_data.append((id, ra, dec, jd, number_to_submit, action))
+        return photometry_data
 
 
 class GetPhotometry():
@@ -273,11 +308,14 @@ class GetPhotometry():
             print(f'Error: {r.text}')
 
     def save_photometry_date(self):
-
+        photometry_date = None
+        with open(f'{self.path_events_dictionary}/dicts/events_dict_O4b.json', 'r') as file:
+            events_dict = json.load(file)
         if len(self.ra) == 0:
             zfps_date_dict = {self.graceid: 'NA'}  
-        else:    
-            zfps_date_dict = {self.graceid: Time.now().iso}  
+        else:
+            photometry_date = Time.now().iso    
+            zfps_date_dict = {self.graceid: photometry_date}  
         for key, value in zfps_date_dict.items():
             if key in events_dict:
                 if 'flare' not in events_dict[key]:
@@ -287,28 +325,114 @@ class GetPhotometry():
                     json.dump(events_dict, file)
             else:
                 print(f'{key} not in dictionary')
+        return photometry_date
 
     def submit(self):
         if len(self.ra) == 0:
             print('no AGN to submit')
+            return None
         elif any(isinstance(item, list) for item in self.ra):
-            print(f'submit in {len(self.ra)} batches')
+            num_batches = len(self.ra)
+            num_agn = sum([len(x) for x in self.ra])
+            print(f'submit in {num_batches} batches')
             [self.submit_post(r, d, j) for r,d,j in zip(self.ra, self.dec, self.jd)]
         else:
-            print('submit in one batch')           
-            self.submit_post()
-        self.save_photometry_date()
+            num_batches = 1
+            num_agn = len(self.ra)
+            print('submit in one batch')  
+            self.submit_post()         
+        photometry_date = self.submit_post(self.ra, self.dec, self.jd)
+        return photometry_date, num_agn, num_batches
 
 
+
+### functions to save and inspect photometry
 
 
 class SavePhotometry():
-    def __init__(self, graceid, batch_codes, action, path_photometry):
+    def __init__(self, graceid, action, path_photometry, batch_codes=None, submission_date=None, num_batches_submitted=None):
         self.graceid = graceid
         self.batch_codes = batch_codes
         self.action = action
         self.path_photometry = path_photometry
+        self.submission_date = submission_date
+        self.num_batches_submitted = num_batches_submitted
+    
+    def get_coords_batchcode(self):
+        """
+        load zfps table, get coords, format filename given a manually input batch code
+        """
+        action = 'Query Database'
+        settings = {'email': email, 'userpass': userpass, 'option': 'All recent jobs', 'action': action}
+        # fixed IP address/URL where requests are submitted:
+        url = 'https://ztfweb.ipac.caltech.edu/cgi-bin/getBatchForcedPhotometryRequests.cgi'
+        r = requests.get(url, auth = (auth_username, auth_password), params = settings)
+        if r.status_code == 200:
+            print("Script executed normally and queried the ZTF Batch Forced Photometry database.\n")
+            html_content = StringIO(r.text)
+            full_table = pd.read_html(html_content)[0]
+            pattern = '|'.join(self.batch_codes)
+            table_gw = full_table[full_table['lightcurve'].str.contains(pattern, na=False)]
+            print (len(table_gw), 'coords found')
+            ra = table_gw['ra'].tolist()
+            dec = table_gw['dec'].tolist()
+            name = [str(r) + '_' + str(d) for r,d in zip(ra,dec)] 
+        if len(table_gw) == 0:
+            print('No coords found')
+            return None
+        return table_gw, name
+    
+    def get_coords_graceid(self):
+        """
+        load zfps table, get batch_codes, get coords, format filename given the graceid and submission date and number of batches
+        """
+        with gzip.open(f'./bot/data/dicts/crossmatch_dict_O4b.gz', 'rb') as f:
+            crossmatch_dict = pickle.load(f)
+        action = 'Query Database'
+        settings = {'email': email, 'userpass': userpass, 'option': 'All recent jobs', 'action': action}
+        # load the full table of returned zfps:
+        url = 'https://ztfweb.ipac.caltech.edu/cgi-bin/getBatchForcedPhotometryRequests.cgi'
+        r = requests.get(url, auth = (auth_username, auth_password), params = settings)
+        if r.status_code == 200:
+            print("Script executed normally and queried the ZTF Batch Forced Photometry database.\n")
+            html_content = StringIO(r.text)
+            full_table = pd.read_html(html_content)[0]
+            
+            #find the coords we submitted from ra/dec
+            crossmatch_df = pd.DataFrame(crossmatch_dict[self.graceid]['agn_catnorth'])
+            filtered_table = pd.merge(full_table, crossmatch_df, on=['ra', 'dec'])
+                                                                                                                                                                                            
+            #find the coords from our submission date
+            submission_date_astropy = Time(self.submission_date)                                                                                                                                                                                           
+            def is_same_day(date_str):
+                date_astropy = Time(date_str)
+                return (date_astropy.datetime.year == submission_date_astropy.datetime.year and
+                        date_astropy.datetime.month == submission_date_astropy.datetime.month and
+                        date_astropy.datetime.day == submission_date_astropy.datetime.day)
+            filtered_table['matches_date'] = filtered_table['created'].apply(is_same_day)
+            filtered_table = filtered_table[filtered_table['matches_date']]
+            filtered_table = filtered_table.drop(columns=['matches_date'])
+            print(f'{len(filtered_table)} coords found')
 
+            # check if we retrieved the same number of batches as submitted, if not likely not complete yet
+            # this will break when batch codes are > 5 digits
+            def extract_batch_code(lightcurve):
+                match = re.search(r'/(\d{5})/', lightcurve)
+                if match:
+                    return match.group(0) 
+                return None
+            filtered_table['batch_code'] = filtered_table['lightcurve'].apply(extract_batch_code)
+            num_batches_received = filtered_table['batch_code'].nunique()
+            batches_received = filtered_table['batch_code'].unique()
+            if num_batches_received != self.num_batches_submitted:
+                print(f'Returned {num_batches_received} batches for {self.num_batches_submitted} submitted')
+                return None
+
+        ra = filtered_table['ra'].tolist()
+        dec = filtered_table['dec'].tolist()
+        name = [str(r) + '_' + str(d) for r, d in zip(ra, dec)]
+        return filtered_table, name, batches_received
+    
     def get_photometry(self):
         """
         Check completion and return list URLs (only saved 30 days post request):
@@ -329,27 +453,6 @@ class SavePhotometry():
         batch_lightcurves = [lc for lc in batch_url if any(batch in lc for batch in self.batch_codes)]
         print("Retrieved", len(batch_lightcurves), "lightcurves")
         return batch_lightcurves
-    
-    def get_coords(self):
-        """
-        load zfps table, get coords, format filename
-        """
-        action = 'Query Database'
-        settings = {'email': email, 'userpass': userpass, 'option': 'All recent jobs', 'action': action}
-        # fixed IP address/URL where requests are submitted:
-        url = 'https://ztfweb.ipac.caltech.edu/cgi-bin/getBatchForcedPhotometryRequests.cgi'
-        r = requests.get(url, auth = (auth_username, auth_password), params = settings)
-        if r.status_code == 200:
-            print("Script executed normally and queried the ZTF Batch Forced Photometry database.\n")
-            html_content = StringIO(r.text)
-            full_table = pd.read_html(html_content)[0]
-            pattern = '|'.join(self.batch_codes)
-            table_gw = full_table[full_table['lightcurve'].str.contains(pattern, na=False)]
-            print (len(table_gw), 'coords found')
-            ra = table_gw['ra'].tolist()
-            dec = table_gw['dec'].tolist()
-            name = [str(r) + '_' + str(d) for r,d in zip(ra,dec)] 
-        return table_gw, name
 
     def df_from_url (url, file):
         """
@@ -369,7 +472,7 @@ class SavePhotometry():
         df_qf_cut = df_qf[['dnearestrefsrc', 'zpdiff', 'nearestrefmag', 'nearestrefmagunc', 'forcediffimflux', 'forcediffimfluxunc','filter', 'jd']]
         return(df_qf_cut)
 
-    def download_lightcurves (df, name):
+    def download_lightcurves (self, df, name):
         """
         Download lightcurve files to local directory
         """
@@ -377,7 +480,7 @@ class SavePhotometry():
         save_as = f"{directory}{name}.gz" 
         df.to_pickle(save_as, compression='gzip')
 
-    def load_event_lightcurves(filename):
+    def load_event_lightcurves(self, filename):
         """
         if updating existing photometry
         """
@@ -386,9 +489,19 @@ class SavePhotometry():
         coords = [file for file in filename if os.path.exists(dir + file + '.gz')]
         return df, coords
 
-    def get_batch_photometry(self): 
+    def save(self): 
+        if self.batch_codes:
+            # retrieve coords from manually input batch code
+            retrieved_photometry = self.get_coords_batchcode()
+        else:
+            # retrieve coords directly from graceid
+            retrieved_photometry = self.get_coords_graceid()
+        if retrieved_photometry is None: # if not all batches are returned
+            return None
+        filename  = retrieved_photometry[1]
+        if self.batch_codes == None:
+            self.batch_codes = retrieved_photometry[2]
         lightcurves = self.get_photometry() 
-        table, filename = self.get_coords()
         result = [self.df_from_url(url, file) for url, file in zip(lightcurves, filename)]
         errors = [x for x in result if x is None]
         values = [x for x in result if x is not None]
@@ -403,17 +516,152 @@ class SavePhotometry():
                 batch_photometry_existing[i] = pd.concat([batch_photometry_existing[i], lc_cut[i]]).drop_duplicates()
             if len(batch_photometry_existing) == len(filename_updated):
                 [self.download_lightcurves(i,j) for i,j in zip(batch_photometry_existing, filename_updated)]
-                print('downloaded', len(batch_photometry_existing), 'lightcurves')
+                num_returned = len(batch_photometry_existing)                
             else:
-                print('Error: different number of lightcurves and filenames')   
+                print('Error: different number of lightcurves and filenames')
+                return None   
         # save the new photometry
         else:
             if len(lc_cut) == len(filename_updated):
                 [self.download_lightcurves(i,j) for i,j in zip(lc_cut, filename_updated)]
-                print('downloaded', len(lc_cut), 'lightcurves')
+                num_returned = len(lc_cut)
             else:
-                print('Error: different number of lightcurves and filenames')  
+                print('Error: different number of lightcurves and filenames') 
+                return None
+        
+        print('downloaded', num_returned, 'lightcurves')
+        return self.batch_codes, num_returned, errors
+            
+        
 
+class PhotometryLog():
+    def __init__(self, path_pipeline, graceid=None, column=None, value=None, new_row=None):
+        self.path_pipeline = path_pipeline
+        self.graceid = graceid
+        self.column = column
+        self.value = value
+        self.new_row = new_row
+
+        with open(self.path_pipeline, 'r') as file:
+            photometry_pipeline = json.load(file)
+        self.photometry_pipeline = photometry_pipeline
+ 
+    def check_completed_events(self):
+        """
+        check for events outside our 200 day window of observability
+        """
+        for id in self.photometry_pipeline.keys():
+            if self.photometry_pipeline[id]['over_200_days'] or 'dateobs' not in self.photometry_pipeline[id]:
+                continue
+            dateobs = self.photometry_pipeline[id]['dateobs']
+            if (Time.now() - Time(dateobs, format='isot')).value > 200:
+                self.photometry_pipeline[id]['over_200_days'] = True
+                print(f'Event {id} is over 200 days old')
+                with open(self.path_pipeline, 'w') as file:
+                    json.dump(self.photometry_pipeline, file, indent=4)
+
+    def update_summary_stats(self, number_requested, number_saved, keyword):
+        """
+        keep track of total requests and saved requests
+        use pending value to prevent from having > 20,000 requests at once, which ZFPS wont allow
+        """
+        if keyword == 'new_request':
+            self.photometry_pipeline['summary_stats']['total_requests'] += number_requested
+            self.photometry_pipeline['summary_stats']['total_currently_pending'] += number_requested
+        elif keyword == 'saved_request':
+            self.photometry_pipeline['summary_stats']['total_currently_pending'] -= number_requested
+            self.photometry_pipeline['summary_stats']['total_saved'] += number_saved
+        else:
+            raise ValueError("Invalid keyword. Use 'new_request' or 'saved_request'.")
+
+        with open(self.path_pipeline, 'w') as file:
+            json.dump(self.photometry_pipeline, file, indent=4)
+
+    def check_number_pending(self):
+        """
+        check how many requests are currently pending
+        """
+        pending = self.photometry_pipeline['summary_stats']['total_currently_pending']
+        print(f'Total number of pending requests: {pending}')
+        return pending
+
+    def add_event(self, event_id, event_data):
+        """
+        Add a new event to the photometry pipeline.
+        """
+        if event_id not in self.photometry_pipeline:
+            self.photometry_pipeline[event_id] = event_data
+            num_agn = event_data['zfps']['num_agn_submitted']
+            self.update_summary_stats(number_requested=num_agn,number_saved=0,keyword='new_request')
+            with open(self.path_pipeline, 'w') as file:
+                json.dump(self.photometry_pipeline, file, indent=4)
+            print(f"Event ID {event_id} added successfully.")
+        else:
+            print(f"Event ID {event_id} already exists in the photometry pipeline.")
+
+    def add_zfps_entry(self, event_id, new_entry):
+        """
+        Add a new entry to the zfps list for a given event ID.
+        """
+        if event_id in self.photometry_pipeline:
+            if 'zfps' not in self.photometry_pipeline[event_id]:
+                self.photometry_pipeline[event_id]['zfps'] = []
+            self.photometry_pipeline[event_id]['zfps'].append(new_entry)
+            num_agn = new_entry['num_agn_submitted']
+            self.update_summary_stats(number_requested=num_agn,number_saved=0,keyword='new_request')
+            with open(self.path_pipeline, 'w') as file:
+                json.dump(self.photometry_pipeline, file, indent=4)
+            print(f"New ZFPS added to {event_id}.")
+        else:
+            print(f"Event ID {event_id} not found in the photometry pipeline.")
+    
+    def check_photometry_status(self):
+        """
+        Check if we should request or retrieve photometry for any event
+        """
+        first_update_request = []
+        pending_request = []
+        update_request = []
+        for id in self.photometry_pipeline.keys():
+            if self.photometry_pipeline[id]['over_200_days'] or 'dateobs' not in self.photometry_pipeline[id]:
+                continue
+            for x in self.photometry_pipeline[id]['zfps']:
+                if not x['complete']:
+                    pending_request.append(id, x['submission_date'], x['num_batches_submitted'])
+            dateobs = self.photometry_pipeline[id]['dateobs']
+            time_delta = round((Time.now() - Time(dateobs, format='isot')).to_value('jd'))
+            # TODO this will break if we don't run one day, add check to ensure we dont miss any request?
+            if time_delta == 9:
+                first_update_request.append(id)
+            if time_delta in [20, 30, 50, 100]:
+                update_request.append(id)
+        print(f'First update request: {first_update_request}')
+        print(f'Pending request: {pending_request}')
+        print(f'Update request: {update_request}')
+        return first_update_request, update_request, pending_request
+    
+    def update_photometry_complete(self, event_id, submission_date, batch_ids, num_returned, num_broken):
+        """
+        Update the photometry status for a given event ID.
+        """
+        if event_id in self.photometry_pipeline:
+            for x in self.photometry_pipeline[event_id]['zfps']:
+                if x['submission_date'] == submission_date:
+                    x['complete'] = True
+                    x['batch_ids'] = batch_ids
+                    x['number_returned'] = num_returned
+                    x['number_broken'] = num_broken
+                    # update summary
+                    num_req = x['num_agn_submitted']
+                    self.update_summary_stats(number_requested=num_req,number_saved=num_returned,keyword='saved_request')
+                    #save
+                    with open(self.path_pipeline, 'w') as file:
+                        json.dump(self.photometry_pipeline, file, indent=4)
+                    print(f"Photometry status updated for {event_id}.")
+                    return
+            print(f"Submission date {submission_date} not found for {event_id}.")
+        else:
+            print(f"Event ID {event_id} not found in the photometry pipeline.")
 
 
 class PlotPhotometry():

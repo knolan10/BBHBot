@@ -1,3 +1,0 @@
-eventid,dateobs,date_last_photometry,waiting_for_update_photometry,over_200_days
-example1,2025-01-01T00:00:00.000,2025-02-01T00:00:00.000,False,False
-example2,2025-01-01T00:00:00.000,2025-02-01T00:00:00.000,True,False

@@ -42,7 +42,7 @@ It calculates medians and median absolute deviations for 50 day windows over a 2
 
 This script is designed to run once per day and handle two main tasks: (1) advancing events through the pipeline for anomalous flare detection and (2) ingesting any new mergers from gracedb.
 
-First it checkes for pending tasks related to events actively being processed (ie in 200 day window post GW). 9 days after the gravitational wave detection (complementary to the followup ZTF trigger requested 7 days after the GW detection), this script with save the forced photometry requested for all AGN in the localization which have no existing photometry. It will then request an update to the photometry for all AGN in the localization.
+First it checkes for pending tasks related to events actively being processed (ie in 200 day window post GW). 9 days after the gravitational wave detection (complementary to the followup ZTF trigger requested 7 days after the GW detection), this script will save the forced photometry requested for all AGN in the localization which have no existing photometry. It will then request an update to the photometry for all AGN in the localization.
 
 The script will also request additional updates to photometry 20, 30, 50, and 100 after the GW detection. 
 
