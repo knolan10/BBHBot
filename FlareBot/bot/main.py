@@ -14,17 +14,17 @@ mlp_modelpath = 'mlp_model.sav'
 path_photometry_pipeline = 'data/photometry_pipeline.csv'
 # mode (testing means don't push results, dont request forced photometry)
 testing = True  
-do_photometry = True # this flag will be changed to false if we hit the 20000 request limit
+do_photometry = True # this flag will be changed to false if we hit the 15000 request limit
 
 ###PART 1 : check flare_pipeline for pending tasks
 followup = PhotometryLog(path_photometry_pipeline)
 followup.check_completed_events()
 first_update, update, pending = followup.check_photometry_status()
 number_pending_requests = followup.check_number_pending()
-if number_pending_requests > 19000:
+if number_pending_requests > 15000:
     do_photometry = False
 
-# retrieve new photometry request for events that are 9 days in
+# retrieve new photometry results for events that are 9 days in
 save_photometry = SavePhotometry(path_photometry=path_photometry)
 for x in first_update:
     id, date_submitted, num_batches = x[0], x[1], x[2]
@@ -35,7 +35,7 @@ for x in first_update:
         num_broken_urls = saved[2]
         followup.update_photometry_complete(id, date_submitted, batch_ids, num_returned, num_broken_urls)
 
-# check for queued photometry requests (if we previously hit the 20000 limit)
+# check for queued photometry requests (if we previously hit the 15000 limit)
 if not testing and do_photometry:
     queued_photometry = PhotometryCoords.retrieve_queue_photometry(path_queued_photometry)
     if len(queued_photometry) > 0:
@@ -46,7 +46,7 @@ if not testing and do_photometry:
             jd = x[3]
             action = x[4]
             number_to_submit = x[4]
-            if number_pending_requests + number_to_submit > 20000:
+            if number_pending_requests + number_to_submit > 15000:
                 do_photometry = False
                 break
             submission = GetPhotometry(graceid=id,
@@ -82,7 +82,7 @@ for x in update + first_update_ids:
                             path_photometry=path_photometry).get_photometry_coords()
     
     #make sure we are within photometry limit
-    if number_pending_requests + number_agn > 20000:
+    if number_pending_requests + number_agn > 15000:
         PhotometryCoords.queue_photometry(x, ra, dec, jd, number_agn, 'update', path_queued_photometry)
         do_photometry = False
         continue
@@ -194,7 +194,7 @@ for id, date in zip(eventid, dateobs):
 
     else:
         #make sure we are within photometry limit
-        if number_pending_requests + number_agn > 20000:
+        if number_pending_requests + number_agn > 15000:
             PhotometryCoords.queue_photometry(id, ra, dec, jd, number_agn, 'new', path_queued_photometry)
             do_photometry = False
             continue

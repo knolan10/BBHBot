@@ -12,6 +12,7 @@ from io import StringIO
 import io
 import seaborn as sns
 import matplotlib.pyplot as plt 
+import math
 
 #credentials
 with open('bot/FlareBotCredentials.yaml', 'r') as file:
@@ -84,6 +85,7 @@ class PhotometryCoords():
         """"
         get AGN coords for a given event
         Depending on action variable, will get all coords, only coords we have no photometry, or coords and dates to update photometry
+        If retrieving new coords order them based on 
         input: graceid (string), catalog (list of string names of catalogs), action ('all', 'new', 'update') 
         """
         # open the stored event info
@@ -97,7 +99,7 @@ class PhotometryCoords():
             coords_catnorth = crossmatch_dict[self.graceid]['agn_catnorth']
         if 'quaia' in self.catalog:
             coords_quaia = crossmatch_dict[self.graceid]['agn_quaia']
-        all_coords = coords_catnorth + coords_quaia
+        all_coords = coords_catnorth + coords_quaia       
         #remove AGN below dec = -30 as rough ZTF footprint
         ztf_coords = [d for d in all_coords if d.get('dec', 0) >= -30]
         gw_jd = events_dict[self.graceid]['gw']['GW MJD'] + 2400000.5
@@ -187,21 +189,13 @@ class PhotometryCoords():
             events_dict = json.load(file)
         ra = [val['ra'] for val in coords]
         dec = [val['dec'] for val in coords]
-        if len(coords) > 15000:
-            print('More than 15000 AGN - over maximum submissions allowed at one time')   
-            return
-        elif len(coords) == 0:   
+        if len(coords) == 0:   
             print('no AGN to submit')
             events_dict[self.graceid]['flare'] = {'date_last_zfps': 'no AGN observable by ZTF'}
             with open(f'{self.path_events_dictionary}/dicts/events_dict_O4b.json', 'w') as file:
                 json.dump(events_dict, file) 
             return
-        elif len(coords) <= 1500:
-            if self.verbose:
-                print('Fewer than 1500 AGN - submit in one batch')
-            return ra, dec, date
-        # submit in multiple batches when >1500 objects
-        elif len(coords) > 1500:
+        else:
             ralist = [ra[i:i+1500] for i in range(0, len(ra), 1500)]
             declist = [dec[i:i+1500] for i in range(0, len(dec), 1500)]
             if self.action == 'update':
@@ -246,7 +240,27 @@ class PhotometryCoords():
             print(f'After batching for ZFPS, retrieved {len(date)} objects in {len(jd)} batches')
         else:
             ra,dec,jd = self.format_for_zfps(coords, date)
-        ra,dec = self.replace_scientific_notation(ra, dec)
+        # handle events that have > 15000 AGN to submit (note - this should always be in batches of 1500 max)
+        # might be better not to assume max size of 1500, but something is wrong in code if this isn't true
+        # therefore assume we can submit 10 batches at a time
+        if num_agn > 15000:
+            num_batches_for_limit = math.ceil((len(ra)) / 10)
+            for i in range(1,num_batches_for_limit):
+                start_index = i * 10
+                end_index = i * 10 + 10
+                number_queued = sum(len(x) for x in ra[start_index:end_index])
+                name_queued = f'{self.graceid}_{i}'
+                self.queue_photometry(name_queued, 
+                                      ra[start_index:end_index], 
+                                      dec[start_index:end_index], 
+                                      jd[start_index:end_index], 
+                                      number_queued, 
+                                      self.action, 
+                                      self.path_photometry)
+            # to submit now
+            ra, dec, jd = ra[:10], dec[:10], jd[:10]
+            num_agn = sum([len(x) for x in ra]) 
+
         return ra, dec, jd, num_agn
     
     def queue_photometry(id, ra, dec, jd, number_to_submit, action, path_queued_photometry):
@@ -254,6 +268,9 @@ class PhotometryCoords():
         If we are at request limit, save for later submission
         """
         file_path = os.path.join(path_queued_photometry, f"{id}.json")
+        if os.path.exists(file_path):
+            timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+            file_path = os.path.join(path_queued_photometry, f"{id}_{timestamp}.json")
         data = {
             "ra": ra,
             "dec": dec,
@@ -275,7 +292,8 @@ class PhotometryCoords():
                 file_path = os.path.join(path_queued_photometry, file_name)
                 with open(file_path, 'r') as file:
                     data = json.load(file)
-                    id = os.path.splitext(file_name)[0]
+                    match = re.match(r"^(.*?)(?:_\d{14})?\.json$", file_name)
+                    id = match.group(1) if match else os.path.splitext(file_name)[0]
                     ra = data.get("ra")
                     dec = data.get("dec")
                     jd = data.get("jd")
@@ -330,7 +348,7 @@ class GetPhotometry():
     def submit(self):
         if len(self.ra) == 0:
             print('no AGN to submit')
-            return None
+            return None   
         elif any(isinstance(item, list) for item in self.ra):
             num_batches = len(self.ra)
             num_agn = sum([len(x) for x in self.ra])

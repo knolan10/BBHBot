@@ -528,9 +528,30 @@ class KowalskiCrossmatch():
                     for l,d,zn,zx in zip(localization_name, date, zmin, zmax)]
         quaia = [self.crossmatch_quaia(kowalski,l,contour,d,zn,zx,mindec)
                     for l,d,zn,zx in zip(localization_name, date, zmin, zmax)]
+        
+        # order coords based on skymap probability, so when we submit to ZFPS we submit highest prob first
+        # test this
+        skymap = Table.read(BytesIO(base64.b64decode(skymap_str)))
+        max_level = 29 # arbitrarily high resolution
+        max_nside = ah.level_to_nside
+        level, ipix = ah.uniq_to_level_ipix(skymap['UNIQ'])
+        index = ipix * (2**(max_level - level))**2
+        sorter = np.arsort(index)
+        agn_prob = []
+        for coord in catnorth:
+            ra, dec = coord['ra'] * u.deg, coord['dec'] * u.deg
+            match_ipix = ah.lonlat_to_healpix(ra, dec, max_nside, order='nested')
+            i = sorter[np.searchsorted(index, match_ipix, side='right', sorter=sorter)]
+            prob = skymap[i]['PROBDENSITY'].to_value(u.deg**-2)
+            agn_prob.append(prob)
+        paired = list(zip(agn_prob, catnorth))
+        paired_sorted = sorted(paired, key=lambda x: x[0], reverse=True)
+        _, catnorth_sorted = zip(*paired_sorted)
+        catnorth = list(catnorth_sorted)
+
         if not self.testing:
         # save coords for catnorth crossmatch
-            crossmatch_dict = {id: {'agn_catnorth': coords} for id, coords in zip(localization_name, catnorth)}
+            crossmatch_dict = {localization_name: {'agn_catnorth': coords} for coords in catnorth}
             with gzip.open(f'{self.path_events_dictionary}/dicts/crossmatch_dict_O4b.gz', 'rb') as f:
                 crossmatch_dict_add = pickle.load(f)
             for key, value in crossmatch_dict.items():
