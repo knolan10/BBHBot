@@ -186,7 +186,6 @@ def submit_plan(token, allocation_id, gracedbid, gcnevent_id, localization_id, m
         "Authorization": f'token {token}'
     }
     response = requests.post(url, json=data, headers=headers)
-    print(response.json())
     return queuename
 
 def get_plan_stats(gcnevent_id, queuename, token, mode):
@@ -234,10 +233,6 @@ def get_plan_stats(gcnevent_id, queuename, token, mode):
         return past_submission, total_time, probability, start_observation, observation_plan_id
 
     except MyException as e:
-        print(f'error: {e}')
-        return None
-
-    except Exception as e:
         print(f'error: {e}')
         return None
 

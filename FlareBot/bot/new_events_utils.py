@@ -40,11 +40,13 @@ allocation = credentials['allocation']
 
 
 class GetSuperevents():
-    def __init__(self, path_events_dictionary, mlp_modelpath, event_source, kafka_response=None):
+    def __init__(self, path_events_dictionary, mlp_modelpath, event_source, runid='O4c', kafka_response=None, retrieve_all=False):
         self.path_events_dictionary = path_events_dictionary
         self.mlp_modelpath = mlp_modelpath
         self.event_source = event_source
+        self.runid = runid
         self.kafka_response = kafka_response
+        self.retrieve_all = retrieve_all
 
     # todo : cut unused params returned
     # todo : add a date to the gracedb query so we aren't getting all of 04b
@@ -154,16 +156,17 @@ class GetSuperevents():
 
     def get_new_events(self):
         if self.event_source == 'gracedb':
-            event_iterator = g.superevents('runid: O4b SIGNIF_LOCKED')
-            graceids_all = [superevent['superevent_id'] for superevent in event_iterator]
-            print(len(graceids_all), 'significant superevents in O4b')
-            responses = [g.superevent(id) for id in graceids_all]
-            data_all = [r.json() for r in responses]
-            with open(f'{self.path_events_dictionary}/dicts/events_dict_O4b.json', 'r') as file:
-                events_dict_add = json.load(file)
-            new_events = [(i, j) for i, j in zip(graceids_all, data_all) if i not in list(events_dict_add.keys())]
-            graceids = [x[0] for x in new_events]
-            data = [x[1] for x in new_events]
+            event_iterator = g.superevents(f'runid: {self.runid} SIGNIF_LOCKED')
+            graceids = [superevent['superevent_id'] for superevent in event_iterator]
+            print(f'{len(graceids)} significant superevents in {self.runid}')
+            responses = [g.superevent(id) for id in graceids]
+            data = [r.json() for r in responses]
+            if not self.retrieve_all:
+                with open(f'{self.path_events_dictionary}/dicts/events_dict_{self.runid}.json', 'r') as file:
+                    events_dict_add = json.load(file)
+                new_events = [(i, j) for i, j in zip(graceids, data) if i not in list(events_dict_add.keys())]
+                graceids = [x[0] for x in new_events]
+                data = [x[1] for x in new_events]
             response = self.read_from_gracedb(graceids, data)
         elif self.event_source == 'kafka':
             response = [self.kafka_response]
@@ -179,6 +182,9 @@ class GetSuperevents():
         MLP = pickle.load(open(self.mlp_modelpath, 'rb'))
         mass = [self.m_total_mlp(MLP, d, f, dl_bns=168.) for d, f in zip(dist, far)]
         return [list(i)+list(j)+[k] for i,j,k in zip(params, skymap_data, mass)]
+
+
+
 
 class Fritz():
     def __init__(self, eventid, dateid, a90, far, mass):
@@ -285,6 +291,8 @@ class Fritz():
         
     def get_trigger_status(self):    
         plans = self.query_fritz_observation_plans(allocation, fritz_token)
+        if not plans:
+            raise ValueError('No plans found')
         observation_plan_requests = plans['data']['observation_plan_requests']
         print(f'There are currently {plans['data']['totalMatches']} observation plans generated')
         trigger_status = [self.determine_trigger_status(observation_plan_requests, i, j, a, f, m) 
@@ -310,11 +318,12 @@ class Fritz():
     
 
 class NewEventsToDict():
-    def __init__(self, params, trigger_status, path_events_dictionary, check_before_run=False):
+    def __init__(self, params, trigger_status, path_events_dictionary, runid='O4c', check_before_run=False):
         self.params = params
         self.trigger_status = trigger_status
-        self.check_before_run = check_before_run
         self.path_events_dictionary = path_events_dictionary
+        self.runid = runid
+        self.check_before_run = check_before_run
 
     def generate_cadence_dates(self,input_dates):
         cadence = [7, 14, 21, 28, 40, 50]
@@ -364,7 +373,7 @@ class NewEventsToDict():
         df_for_dict = new_events_df.drop(columns=['plan time', 'plan probability', 'plan start', 'cadence'])
         new_events_dict = df_for_dict.to_dict(orient='index')
 
-        with open(f'{self.path_events_dictionary}/dicts/events_dict_O4b.json', 'r') as file:
+        with open(f'{self.path_events_dictionary}/dicts/events_dict_{self.runid}.json', 'r') as file:
             events_dict_add = json.load(file)
 
         # add any new events to saved dict
@@ -391,26 +400,28 @@ class NewEventsToDict():
         if not self.check_before_run:
             save = input("Save dictionary with new events added? (yes/no): ").strip().lower()
             if save == 'yes':
-                with open(f'{self.path_events_dictionary}/dicts/events_dict_O4b.json', 'w') as file:
+                with open(f'{self.path_events_dictionary}/dicts/events_dict_{self.runid}.json', 'w') as file:
                     json.dump(events_dict_add, file)
                 print("New events saved to dictionary.")
             else:
                 print("New events not saved.") 
         else: # save automatically
-            with open(f'{self.path_events_dictionary}/dicts/events_dict_O4b.json', 'w') as file:
+            with open(f'{self.path_events_dictionary}/dicts/events_dict_{self.runid}.json', 'w') as file:
                 json.dump(events_dict_add, file)
             print("New events saved to dictionary.")
         return new_events_df
 
 
 class KowalskiCrossmatch():
-    def __init__(self, localization_name, skymap_str, dateobs, zmin, zmax, path_events_dictionary, contour=90, mindec=-90, testing=False): 
+    def __init__(self, localization_name, skymap_str, dateobs, zmin, zmax, path_events_dictionary, runid='O4c', catalogs=['catnorth'], mindec=-90, contour=90, testing=False): 
         self.localization_name = localization_name
         self.skymap_str = skymap_str
         self.dateobs = dateobs
         self.zmin = zmin
         self.zmax = zmax
         self.path_events_dictionary = path_events_dictionary
+        self.runid = runid
+        self.catalogs = catalogs
         self.mindec = mindec
         self.contour = contour
         self.testing = testing
@@ -442,7 +453,7 @@ class KowalskiCrossmatch():
         return kowalski
 
     def check_events_to_crossmatch(self):
-        with open(f'{self.path_events_dictionary}/dicts/events_dict_O4b.json', 'r') as file:
+        with open(f'{self.path_events_dictionary}/dicts/events_dict_{self.runid}.json', 'r') as file:
             events_dict_add = json.load(file)
         do_crossmatch = [key for key, value in events_dict_add.items() if not value['crossmatch']]
         print(f'{len(do_crossmatch)} events are missing crossmatch: {do_crossmatch}')
@@ -506,8 +517,32 @@ class KowalskiCrossmatch():
         """
         kowalski.api('delete', 'api/skymap', data={'dateobs': dateobs, 'localization_name': localization_name}, name = machine)
 
+    def sort_coords_by_prob(self, skymapstring, coords):
+        """
+        order coords based on skymap probability, so when we submit to ZFPS we submit highest prob first
+        """
+        # test this
+        skymap = Table.read(BytesIO(base64.b64decode(skymapstring)))
+        max_level = 29 # arbitrarily high resolution
+        max_nside = ah.level_to_nside(max_level)
+        level, ipix = ah.uniq_to_level_ipix(skymap['UNIQ'])
+        index = ipix * (2**(max_level - level))**2
+        sorter = np.argsort(index)
+        agn_prob = []
+        for coord in coords:
+            ra, dec = coord['ra'] * u.deg, coord['dec'] * u.deg
+            match_ipix = ah.lonlat_to_healpix(ra, dec, max_nside, order='nested')
+            i = sorter[np.searchsorted(index, match_ipix, side='right', sorter=sorter) - 1]
+            prob = skymap[i]['PROBDENSITY']#.to_value(u.deg**-2)
+            agn_prob.append(prob)
+        paired = list(zip(agn_prob, coords))
+        paired_sorted = sorted(paired, key=lambda x: x[0], reverse=True)
+        if not paired_sorted:
+            return []
+        prob_sorted, coords_sorted = zip(*paired_sorted)
+        return list(coords_sorted)
 
-    def get_crossmatches(self): 
+    def get_crossmatches(self, crossmatch_new=True): 
         """
         get catnorth and quaia crossmatches
         """
@@ -520,68 +555,82 @@ class KowalskiCrossmatch():
         zmax = self.zmax
         mindec = self.mindec
 
-        [self.load_skymap_to_kowalski(kowalski,l,s,d,contour,'gloria') 
-         for l,s,d in zip(localization_name, skymap_str, date)]
-        [self.load_skymap_to_kowalski(kowalski,l,s,d,contour,'kowalski') 
-         for l,s,d in zip(localization_name, skymap_str, date)]
-        catnorth = [self.crossmatch_catnorth(kowalski,l,contour,d,zn,zx,mindec)
-                    for l,d,zn,zx in zip(localization_name, date, zmin, zmax)]
-        quaia = [self.crossmatch_quaia(kowalski,l,contour,d,zn,zx,mindec)
-                    for l,d,zn,zx in zip(localization_name, date, zmin, zmax)]
-        
-        # order coords based on skymap probability, so when we submit to ZFPS we submit highest prob first
-        # test this
-        skymap = Table.read(BytesIO(base64.b64decode(skymap_str)))
-        max_level = 29 # arbitrarily high resolution
-        max_nside = ah.level_to_nside
-        level, ipix = ah.uniq_to_level_ipix(skymap['UNIQ'])
-        index = ipix * (2**(max_level - level))**2
-        sorter = np.arsort(index)
-        agn_prob = []
-        for coord in catnorth:
-            ra, dec = coord['ra'] * u.deg, coord['dec'] * u.deg
-            match_ipix = ah.lonlat_to_healpix(ra, dec, max_nside, order='nested')
-            i = sorter[np.searchsorted(index, match_ipix, side='right', sorter=sorter)]
-            prob = skymap[i]['PROBDENSITY'].to_value(u.deg**-2)
-            agn_prob.append(prob)
-        paired = list(zip(agn_prob, catnorth))
-        paired_sorted = sorted(paired, key=lambda x: x[0], reverse=True)
-        _, catnorth_sorted = zip(*paired_sorted)
-        catnorth = list(catnorth_sorted)
+        # sort which events to crossmatch
+        if crossmatch_new:
+            ids_to_crossmatch = self.check_events_to_crossmatch()
+        ids_not_in_localization = set(ids_to_crossmatch) - set(localization_name)
+        localization_not_in_ids = set(localization_name) - set(ids_to_crossmatch)
+        if ids_not_in_localization:
+            print(f"these events need crossmatches but data were not provided: {ids_not_in_localization}")
+            ids_to_crossmatch = [id for id in ids_to_crossmatch if id in localization_name]
+        if localization_not_in_ids and crossmatch_new:
+            print(f"data for these events were provided, but they were skipped because only new crossmatches were performed: {localization_not_in_ids}")
+        print(f'Crossmatching {len(ids_to_crossmatch)} events: {ids_to_crossmatch}')
 
+        # do crossmatch
+        if 'catnorth' in self.catalogs:
+            [self.load_skymap_to_kowalski(kowalski,l,s,d,contour,'gloria') 
+             for l,s,d in zip(localization_name, skymap_str, date) if l in ids_to_crossmatch]
+            catnorth_unsorted = [self.crossmatch_catnorth(kowalski,l,contour,d,zn,zx,mindec)
+                        for l,d,zn,zx in zip(localization_name, date, zmin, zmax) if l in ids_to_crossmatch]
+            # sort catnorth so highest prob first
+            catnorth = [self.sort_coords_by_prob(i,j) for i,j in zip(skymap_str, catnorth_unsorted)]
+            [self.delete_skymaps(kowalski, d, l, 'gloria') for d, l in zip(date, localization_name) if l in ids_to_crossmatch]
+        else:
+            catnorth = [None] * len(ids_to_crossmatch)
+
+        if 'quaia' in self.catalogs:
+            [self.load_skymap_to_kowalski(kowalski,l,s,d,contour,'kowalski') 
+             for l,s,d in zip(localization_name, skymap_str, date) if l in ids_to_crossmatch]
+            quaia = [self.crossmatch_quaia(kowalski,l,contour,d,zn,zx,mindec)
+                     for l,d,zn,zx in zip(localization_name, date, zmin, zmax) if l in ids_to_crossmatch]
+            [self.delete_skymaps(kowalski, d, l, 'kowalski') for d,l in zip(date, localization_name) if l in ids_to_crossmatch]
+        else:
+            quaia = [None] * len(ids_to_crossmatch)
+            
         if not self.testing:
-        # save coords for catnorth crossmatch
-            crossmatch_dict = {localization_name: {'agn_catnorth': coords} for coords in catnorth}
-            with gzip.open(f'{self.path_events_dictionary}/dicts/crossmatch_dict_O4b.gz', 'rb') as f:
-                crossmatch_dict_add = pickle.load(f)
-            for key, value in crossmatch_dict.items():
-                if key not in crossmatch_dict_add:
+            # save coords for catnorth crossmatch
+            if not catnorth:
+                print('No catnorth crossmatch')
+            else:
+                # open saved crossmatch dict
+                crossmatch_path=f'{self.path_events_dictionary}/dicts/crossmatch_dict_{self.runid}.gz'
+                if os.path.exists(crossmatch_path):
+                    with gzip.open(crossmatch_path, 'rb') as f:
+                        crossmatch_dict_add = pickle.load(f)
+                else:
+                    crossmatch_dict_add = {}
+                # new entries
+                crossmatch_dict = {name: {'agn_catnorth': coords} for name, coords in zip(ids_to_crossmatch,catnorth)}
+                for key, value in crossmatch_dict.items():
                     crossmatch_dict_add[key] = value
-                    print (key, 'added')
-                else:
-                    print(key, 'already in dictionary')
-            with gzip.open(f'{self.path_events_dictionary}/dicts/crossmatch_dict_O4b.gz', 'wb') as f:
-                f.write(pickle.dumps(crossmatch_dict_add))
-            # save stats on crossmatch
-            crossmatch_dict_stats = {id: {'n_agn_catnorth': len(c), 'n_agn_quaia': len(q)} for id, c, q in zip(localization_name, catnorth, quaia)}
-            with open(f'{self.path_events_dictionary}/dicts/events_dict_O4b.json', 'r') as file:
-                events_dict_add = json.load(file)
-            for key, value in crossmatch_dict_stats.items():
-                if key in events_dict_add:
-                    events_dict_add[key]['crossmatch'] = value
-                else:
-                    print(key, 'not in dictionary')
-            with open(f'{self.path_events_dictionary}/dicts/events_dict_O4b.json', 'w') as file:
-                json.dump(events_dict_add, file)
+                    if key not in crossmatch_dict_add:
+                        print (f'{key} added')
+                    else:
+                        print(f'{key} replaced previously saved crossmatch')
+                with gzip.open(crossmatch_path, 'wb') as f:
+                    f.write(pickle.dumps(crossmatch_dict_add))
+                    
+                # save stats on crossmatch
+                catnorth_count = [len(c) if c else None for c in catnorth]
+                quaia_count = [len(q) if q else None for q in quaia]
+                crossmatch_dict_stats = {id: {'n_agn_catnorth': c, 'n_agn_quaia': q} for id, c, q in zip(ids_to_crossmatch, catnorth_count, quaia_count)}
+                with open(f'{self.path_events_dictionary}/dicts/events_dict_{self.runid}.json', 'r') as file:
+                    events_dict_add = json.load(file)
+                for key, value in crossmatch_dict_stats.items():
+                    if key in events_dict_add:
+                        events_dict_add[key]['crossmatch'] = value
+                    else:
+                        print(f'{key} not in dictionary')
+                with open(f'{self.path_events_dictionary}/dicts/events_dict_{self.runid}.json', 'w') as file:
+                    json.dump(events_dict_add, file)
 
-        [self.delete_skymaps(kowalski, d, l, 'gloria') for d, l in zip(date, localization_name)]
-        [self.delete_skymaps(kowalski, d, l, 'kowalski') for d,l in zip(date, localization_name)]
-
-        return catnorth, quaia
+            return catnorth, quaia
 
 class PushEventsPublic():
-    def __init__(self, path_events_dictionary, testing=False, verbose=True): 
+    def __init__(self, path_events_dictionary, runid='O4c', testing=False, verbose=True): 
         self.path_events_dictionary = path_events_dictionary
+        self.runid = runid
         self.testing = testing
         self.verbose = verbose
 
@@ -608,7 +657,16 @@ class PushEventsPublic():
             print(f"Error output: {e.stderr}")
             print(f"An error occurred: {e}")
 
-    def plot_trigger_timeline(self, trigger_df):
+    def plot_trigger_timeline():
+        trigger_df = pd.read_csv('../events_summary/trigger.md', delimiter='|', skipinitialspace=True).iloc[:, 1:-1]
+        trigger_df = trigger_df.iloc[1:]
+        trigger_df.columns = ['graceids', 'GW MJD', '90% Area (deg2)', '50% Area (deg2)',
+                'Distance (Gpc)', 'FAR (years/FA)', 'Mass (M_sol)', 'gcnids', 'time',
+                'probability', 'start', 'cadence', 'comments']
+        trigger_df['GW MJD'] = trigger_df['GW MJD'].str.strip().astype(int)
+        trigger_df['Mass (M_sol)'] = trigger_df['Mass (M_sol)'].str.strip().astype(int)
+        # trigger_df['GW ISO'] = Time(trigger_df['GW MJD'], format='mjd').iso
+        # trigger_df['GW ISO'] = trigger_df['GW ISO'].str.split('T').str[0]  
         plt.figure(figsize=(10, 2))
         plt.scatter(trigger_df['GW MJD'], [0.1] * len(trigger_df), s=trigger_df['Mass (M_sol)']*10, alpha=0.5)
         plt.xlabel('Date (MJD)', fontsize=18)
@@ -626,7 +684,7 @@ class PushEventsPublic():
         plt.show()
 
     def format_and_push(self):
-        with open(f'{self.path_events_dictionary}/dicts/events_dict_O4b.json', 'r') as file:
+        with open(f'{self.path_events_dictionary}/dicts/events_dict_{self.runid}.json', 'r') as file:
             events_dict_add = json.load(file)
         # convert back to df
         restructured_dict = {key: {'graceids': key, **value['gw']} for key, value in events_dict_add.items()}
@@ -663,7 +721,7 @@ class PushEventsPublic():
         highmass_lowarea = pd.merge(high_mass, low_area)  
         priority = pd.merge(highmass_lowarea, confident)
         if self.verbose:
-            print(len(priority), 'O4b events with FAR > 10 and mass > 60 and area < 1000 sq deg')
+            print(f'{len(priority)} {self.runid} events with FAR > 10 and mass > 60 and area < 1000 sq deg')
         priority = priority.sort_values(by='GW MJD', ascending=False)
         priority = priority.reset_index(drop=True)
         # #manual edits
@@ -687,8 +745,6 @@ class PushEventsPublic():
         #add comments
         trigger_df['comments'] = ''
         trigger_df.loc[trigger_df['graceids'].str.contains('S241125n'), 'comments'] = 'Swift/Bat coincident detection'
-        if self.verbose:
-            self.plot_trigger_timeline(trigger_df)
 
         #trigger errors
         error_triggers = df_full[(df_full['trigger'] == 'bad trigger') | 
@@ -714,24 +770,23 @@ class PushEventsPublic():
         error_triggers = error_triggers.fillna('')
 
         trigger_df['cadence'] = trigger_df['cadence'].apply(lambda dates: [date.replace('-', '.') for date in dates] if isinstance(dates, list) else dates)
-        markdown_table_O4b = df.to_markdown(index=False)
-        markdown_table_O4b_priority = priority.to_markdown(index=False)
+        markdown_table = df.to_markdown(index=False)
+        markdown_table_priority = priority.to_markdown(index=False)
         markdown_table_trigger = trigger_df.to_markdown(index=False)
         markdown_table_error_triggers = error_triggers.to_markdown(index=False)
         if not self.testing:
-            with open('../../events_summary/O4b.md', 'w') as f:
-                f.write(markdown_table_O4b)
-
-            with open('../../events_summary/O4b_priority.md', 'w') as f:
-                f.write(markdown_table_O4b_priority)
-
-            with open('../../events_summary/trigger.md', 'w') as f:
-                f.write(markdown_table_trigger)
-
-            with open('../../events_summary/error_trigger.md', 'w') as f:
-                f.write(markdown_table_error_triggers)
-
+            summary_dir = '../../events_summary'
+            os.makedirs(summary_dir, exist_ok=True) 
+            files_to_write = {
+                f'{summary_dir}/{self.runid}.md': markdown_table,
+                f'{summary_dir}/{self.runid}_priority.md': markdown_table_priority,
+                f'{summary_dir}/trigger.md': markdown_table_trigger,
+                f'{summary_dir}/error_trigger.md': markdown_table_error_triggers,
+            }
+            for file_path, content in files_to_write.items():
+                if not os.path.exists(file_path):
+                    with open(file_path, 'w') as f:
+                        f.write(content)
             self.push_changes_to_repo()
 
         return df, priority, trigger_df, error_triggers
-

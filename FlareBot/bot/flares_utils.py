@@ -27,6 +27,14 @@ class FlarePreprocessing():
         coords = [file for file in name if os.path.exists(path + file + '.gz')]
         return df, coords
     
+    def load_simulated_lightcurves(self):
+        """
+        open the simulated lightcurves
+        """
+        path = self.path_photometry
+        df = [pd.read_pickle(path + file + '.gz', compression='gzip') for file in os.listdir(path)]
+        return df
+    
     def get_total_fluxes(self, df):
         """
         see zfps sect. 6.5
@@ -138,6 +146,13 @@ class RollingWindowStats():
             stats_for_agn = [self.calculate_meds_mads(df) for df in agn[0:3]]
             gri_stats.append(stats_for_agn)
         return gri_stats
+    
+    def get_rolling_window_stats_simulated(self):
+        """
+        work with simulated data that does not specify color       
+        """
+        stats = [self.calculate_meds_mads(df) for df in self.agn]
+        return stats
 
     
 
