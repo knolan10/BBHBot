@@ -2,11 +2,15 @@ from gcn_kafka import Consumer
 import yaml
 import time
 import pickle
-from triggerfunctions import *
+import threading
+from TriggerBot.bot.trigger_utils import *
+from log import log, heartbeat
 
 with open('../credentials.yaml', 'r') as file:
     credentials = yaml.safe_load(file)
 testing = credentials['testing']
+
+log(f'Starting TriggerBot with testing = {testing}')
 
 #choose whether we use preview.fritz or fritz api
 if testing:
@@ -34,10 +38,15 @@ consumer.subscribe(['gcn.classic.voevent.LVC_PRELIMINARY',
                     'gcn.classic.voevent.LVC_INITIAL',
                     'gcn.classic.voevent.LVC_UPDATE'])
 
+log('subscribed to Kafka consumer')
+heartbeat_thread = threading.Thread(target=heartbeat)
+heartbeat_thread.daemon = True
+heartbeat_thread.start()
+
 while True:
     try:
-        for message in consumer.consume():
-            if message is None:
+        for message in consumer.consume(timeout=1.0):
+            if message.value() is None:
                 continue
             try:
                 value = message.value()
@@ -74,18 +83,24 @@ while True:
                     if triggered:
                         update_trigger_log(superevent_id, 'valid', False)
                         delete_trigger_ztf(trigger_plan_id, fritz_token, mode)
-                    raise MyException(f'{superevent_id} did not pass initial criteria') 
+                        log(f'{superevent_id} has trigger but no longer is valid')
+                    
+                    logmessage = f'{superevent_id} did not pass initial criteria'
+                    log(logmessage)
+                    raise MyException(logmessage)
 
-                print(f'Processing {superevent_id}')
+                log(f'Processing {superevent_id} from {alert_type} alert')
 
                 mass = m_total_mlp(MLP, distmean, far, dl_bns=168.)
                 if mass < 60:
                     if triggered:
                         update_trigger_log(superevent_id, 'valid', False)
                         delete_trigger_ztf(trigger_plan_id, fritz_token, mode)
-                    raise MyException(f'{superevent_id} did not pass mass criteria') 
+                    logmessage = f'{superevent_id} did not pass mass criteria'
+                    log(logmessage)
+                    raise MyException(logmessage)
                 
-                print(f'{superevent_id} passed mass criteria')
+                log(f'{superevent_id} passed mass criteria')
                 
                 # find gcn event on fritz 
                 if not testing:
@@ -98,10 +113,12 @@ while True:
                     gcnevent_id, localization_id = query_fritz_gcn_events(dateobs, skymap_name, fritz_token, mode)
                     time.sleep(30)
                 if gcnevent_id is None:
-                    raise MyException(f'Could not find a GCN event on Fritz for {superevent_id}')
+                    logmessage=f'Could not find a GCN event on Fritz for {superevent_id}'
+                    log(logmessage)
+                    raise MyException(logmessage)
                 
                 # submit plan request to Fritz
-                print(f'requested plan for {superevent_id}')
+                log(f'Submitting plan request for {superevent_id}')
                 queuename = submit_plan(fritz_token, allocation, superevent_id, gcnevent_id, localization_id, mode)
                             
                 # retrieve observation plan for event from Fritz
@@ -112,12 +129,15 @@ while True:
                     fritz_event_status = get_plan_stats(gcnevent_id, queuename, fritz_token, mode)
                     time.sleep(30)
                 if fritz_event_status is None: 
-                    raise MyException(f'Could not find an observing plan for {superevent_id}') 
+                    logmessage = f'Could not find an observing plan for {superevent_id}'
+                    log(logmessage)
+                    raise MyException(logmessage)
                 
                 #API call to Kowalski - check for event keywords in ZTF observing queue
                 if not testing:
                     keyword_list = [dateobs, superevent_id, gcnevent_id]    
                     kowalski_event_status = query_kowalski_ztf_queue(keyword_list, fritz_token, allocation)
+                    log(f'checked ZTF observing queue for key words related to {superevent_id}')
                 else:
                     kowalski_event_status = False
                 
@@ -130,68 +150,79 @@ while True:
                 total_time = fritz_event_status[1]
                 probability = fritz_event_status[2]
                 start_observation = fritz_event_status[3]
-                observation_plan_id = fritz_event_status[4]
+                observation_plan_request_id = fritz_event_status[4]
 
                 if total_time > 5400 or probability < 0.5:
                     if triggered:
                         update_trigger_log(superevent_id, 'valid', False)
                         delete_trigger_ztf(trigger_plan_id, fritz_token, mode)
-                    raise MyException(f'Plan for {superevent_id} with {total_time} seconds and {probability} probability does not meet criteria') 
+                    logmessage = f'Followup plan for {superevent_id} with {total_time} seconds and {probability} probability does not meet criteria'
+                    log(logmessage)
+                    raise MyException(logmessage)
                             
                 if Time.now().mjd - mjd > 1:
                     # don't trigger on events older than 1 day
-                    raise MyException(f'{superevent_id} is more than 1 day old') 
+                    logmessage = f'{superevent_id} is more than 1 day old'
+                    log(logmessage)
+                    raise MyException(logmessage)
 
                 if previous_trigger:
-                    raise MyException(f'Another group triggered on {superevent_id}') 
+                    logmessage = f'Previous trigger for {superevent_id}'
+                    log(logmessage)
+                    raise MyException(logmessage)
                 
                 if triggered:
                     if not check_before_sunset():
-                        raise MyException(f'Too late to update submitted trigger for {superevent_id}') 
+                        logmessage = f'Too late to update submitted trigger for {superevent_id}'
+                        log(logmessage)
+                        raise MyException(logmessage)
                     else:
                         # remove current submitted plan so we can submit new one
                         delete_trigger_ztf(trigger_plan_id, fritz_token, mode)
+                        logmessage = f'Removing previous trigger for {superevent_id} so we can resubmit updated plan'
+                        log(logmessage)
+                        raise MyException(logmessage)
 
                 if testing:
-                    print(f'Plan for {superevent_id} has {total_time} seconds and {probability} probability - would trigger ZTF')
-                    raise MyException(f'Dont actually trigger {superevent_id} in testing mode') 
+                    logmessage=f'Plan for {superevent_id} has {total_time} seconds and {probability} probability - but dont trigger in testing mode'
+                    log(logmessage)
+                    raise MyException(logmessage)
 
                 # check if ZTF survey naturaly covered the skymap previous nights
                 #NEED TO UPDATE THIS FUNCTION SO IT CHECKS NOT JUST FOR OBSERVATIONS BUT FOR SUFFICIENT % COVERAGE
                 startdate = (Time(dateobs) - TimeDelta(2, format='jd')).iso
                 observations = check_executed_observation(startdate, dateobs, gcnevent_id, fritz_token, mode)
                 if observations['data']['totalMatches'] >= 1:
-                    print(f'There is recent coverage of {superevent_id} - not triggering')  
-                    raise MyException(f'{superevent_id} has recent coverage')
+                    logmessage=f'There is recent coverage of {superevent_id} - not triggering'
+                    log(logmessage)
+                    raise MyException(logmessage)
 
                 # send plan to ZTF queue
-                trigger_ztf(observation_plan_id, fritz_token, mode)
+                trigger_ztf(observation_plan_request_id, fritz_token, mode)
+                log(f'Triggered ZTF for {superevent_id} at {Time.now()}')
                 
                 #write to triggered_events.csv
                 trigger_cadence = generate_cadence_dates(dateobs)
                 gcn_type = (alert_type, skymap_name)
-                queued_plan = (observation_plan_id, start_observation)
+                queued_plan = (observation_plan_request_id, start_observation)
                 valid = True
                 add_triggercsv(superevent_id, dateobs, gcn_type, gcnevent_id, localization_id, queued_plan, trigger_cadence, valid)         
                 message = f'ZTF Triggered for {superevent_id}'
                 send_trigger_email(credentials, message, dateobs)
 
+                log(f'post-trigger sleep')
                 time.sleep(120) # after triggering pause to avoid double triggers on quickly updated gcn
         
             
             except MyException as e:
-                print(e)
-                continue
-            
-            except Exception as e:
-                print(e)
+                log(e)
                 continue
 
             finally:
                 consumer.commit(message)
 
     except Exception as e:
-        print(e)
+        log(e)
         continue
 
 

@@ -14,16 +14,28 @@ import seaborn as sns
 import matplotlib.pyplot as plt 
 import math
 
-#credentials
-with open('bot/FlareBotCredentials.yaml', 'r') as file:
-    credentials = yaml.safe_load(file)
+# credentials
+paths = ['FlareBotCredentials.yaml', 'bot/FlareBotCredentials.yaml']
+credentials = None
+for path in paths:
+    try:
+        with open(path, 'r') as file:
+            credentials = yaml.safe_load(file)
+            break  
+    except FileNotFoundError:
+        continue
+if credentials is None:
+    raise Exception("Credentials file not found in any of the specified paths. Check file paths.")
+print("Credentials file loaded successfully.")
 email = credentials['zfps_email']
 userpass = credentials['zfps_userpass']
 auth_username = credentials['zfps_auth']['username']
 auth_password = credentials['zfps_auth']['password']
 
+# TODO: get number pending directly from IPAC
+
 class PhotometryStatus:
-    def __init__(self, observing_run, path_events_dictionary):
+    def __init__(self, observing_run='O4c', path_events_dictionary='bot/data'):
         self.observing_run = observing_run
         self.path_events_dictionary = path_events_dictionary    
 
@@ -32,14 +44,14 @@ class PhotometryStatus:
             with open(f'{self.path_events_dictionary}/dicts/events_dict_{self.observing_run}.json', 'r') as file:
                 events_dict = json.load(file)
         except:
-            print('observing_run must be O4a or O4b')
+            print('observing_run must be O4a, O4b, or O4c')
             return
-        # make this automatic
-        trigger_list = ['S240919bn', 'S240923ct', 'S241006k', 'S241009em', 'S241114y']
+        #TODO: automate
+        trigger_list = ['S240919bn', 'S240923ct', 'S241006k', 'S241009em', 'S241114y', 'S250319bu']
         good_events = [key for key, value in events_dict.items() if value['gw']['Mass (M_sol)'] > 60 
                     and value['gw']['90% Area (deg2)'] < 1000
                     and value['gw']['FAR (years/FA)'] > 10]
-        print(f'{len(events_dict) - len(good_events)} / {len(events_dict)} events in O4b are not priority')
+        print(f'{len(events_dict) - len(good_events)} / {len(events_dict)} events in {self.observing_run} are not priority')
         good_events_dict = {key: events_dict[key] for key in good_events if key in events_dict}
         # put into df for display
         zfps_status_df = pd.DataFrame(
@@ -73,25 +85,27 @@ class PhotometryStatus:
         return zfps_status_df
 
 class PhotometryCoords():
-    def __init__(self, action, graceid, catalog, verbose, path_events_dictionary, path_photometry):
+    def __init__(self, action, graceid, catalog, verbose, path_events_dictionary, path_photometry, observing_run, path_queued_photometry='data/queued_for_photometry'):
         self.action = action
         self.graceid = graceid
         self.catalog = catalog
         self.verbose = verbose
         self.path_events_dictionary = path_events_dictionary
         self.path_photometry = path_photometry
+        self.observing_run = observing_run
+        self.path_queued_photometry = path_queued_photometry
 
     def get_agn_coords(self):
         """"
         get AGN coords for a given event
-        Depending on action variable, will get all coords, only coords we have no photometry, or coords and dates to update photometry
-        If retrieving new coords order them based on 
+        Depending on action variable, will get all coords, only coords we have no photometry, or coords of existing photometry and dates to update photometry
+        If retrieving new coords order them based on skymap probability
         input: graceid (string), catalog (list of string names of catalogs), action ('all', 'new', 'update') 
         """
         # open the stored event info
-        with gzip.open(f'{self.path_events_dictionary}/dicts/crossmatch_dict_O4b.gz', 'rb') as f:
+        with gzip.open(f'{self.path_events_dictionary}/dicts/crossmatch_dict_{self.observing_run}.gz', 'rb') as f:
             crossmatch_dict = pickle.load(f)
-        with open(f'{self.path_events_dictionary}/dicts/events_dict_O4b.json', 'r') as file:
+        with open(f'{self.path_events_dictionary}/dicts/events_dict_{self.observing_run}.json', 'r') as file:
             events_dict = json.load(file)
         coords_catnorth = []
         coords_quaia = []
@@ -142,7 +156,8 @@ class PhotometryCoords():
     def custom_update_batching(self, coords, dates, threshold=60):
         """
         This is for the update mode only
-        ZFPS cant take multiple dates for batched requests, so batch ourselves
+        ZFPS cant take multiple dates for batched requests, so batch ourselves to reduce the number of batches submitted
+        while also reducing the extent to which we request photometry for time periods we already have coverage of
         Threshold will set the window size that we will batch together
         """
         combined = sorted(zip(dates, coords), key=lambda x: x[0])
@@ -185,14 +200,14 @@ class PhotometryCoords():
         """
         get formatting and batching for ZFPS submission
         """
-        with open(f'{self.path_events_dictionary}/dicts/events_dict_O4b.json', 'r') as file:
+        with open(f'{self.path_events_dictionary}/dicts/events_dict_{self.observing_run}.json', 'r') as file:
             events_dict = json.load(file)
         ra = [val['ra'] for val in coords]
         dec = [val['dec'] for val in coords]
         if len(coords) == 0:   
             print('no AGN to submit')
             events_dict[self.graceid]['flare'] = {'date_last_zfps': 'no AGN observable by ZTF'}
-            with open(f'{self.path_events_dictionary}/dicts/events_dict_O4b.json', 'w') as file:
+            with open(f'{self.path_events_dictionary}/dicts/events_dict_{self.observing_run}.json', 'w') as file:
                 json.dump(events_dict, file) 
             return
         else:
@@ -205,7 +220,7 @@ class PhotometryCoords():
         
     def replace_scientific_notation(self, ra_list, dec_list):
         """
-        sometimes coords are formatted in scientific notation, which ZFPS can't handle
+        addressing bug where sometimes coords are formatted in scientific notation, which ZFPS can't handle
         """
         def is_scientific_notation(num):
             return 'e' in f"{num}" or 'E' in f"{num}"
@@ -240,6 +255,7 @@ class PhotometryCoords():
             print(f'After batching for ZFPS, retrieved {len(date)} objects in {len(jd)} batches')
         else:
             ra,dec,jd = self.format_for_zfps(coords, date)
+            jd = [jd] * len(ra)
         # handle events that have > 15000 AGN to submit (note - this should always be in batches of 1500 max)
         # might be better not to assume max size of 1500, but something is wrong in code if this isn't true
         # therefore assume we can submit 10 batches at a time
@@ -250,33 +266,33 @@ class PhotometryCoords():
                 end_index = i * 10 + 10
                 number_queued = sum(len(x) for x in ra[start_index:end_index])
                 name_queued = f'{self.graceid}_{i}'
-                self.queue_photometry(name_queued, 
-                                      ra[start_index:end_index], 
+                # FIXME: this path wont work when running outside of this directory
+                self.queue_photometry(ra[start_index:end_index], 
                                       dec[start_index:end_index], 
                                       jd[start_index:end_index], 
-                                      number_queued, 
-                                      self.action, 
-                                      self.path_photometry)
+                                      number_queued)
+
             # to submit now
             ra, dec, jd = ra[:10], dec[:10], jd[:10]
             num_agn = sum([len(x) for x in ra]) 
+            print(f'Retrieved {num_agn} AGN for submission now')
 
         return ra, dec, jd, num_agn
     
-    def queue_photometry(id, ra, dec, jd, number_to_submit, action, path_queued_photometry):
+    def queue_photometry(self, ra, dec, jd, number_to_submit):
         """
         If we are at request limit, save for later submission
         """
-        file_path = os.path.join(path_queued_photometry, f"{id}.json")
+        file_path = os.path.join(self.path_queued_photometry, f"{self.graceid}.json")
         if os.path.exists(file_path):
             timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-            file_path = os.path.join(path_queued_photometry, f"{id}_{timestamp}.json")
+            file_path = os.path.join(self.path_queued_photometry, f"{self.graceid}_{timestamp}.json")
         data = {
             "ra": ra,
             "dec": dec,
             "jd": jd,
             "number_to_submit": number_to_submit,
-            "action": action
+            "action": self.action
         }
         with open(file_path, 'w') as file:
             json.dump(data, file, indent=4)
@@ -304,17 +320,19 @@ class PhotometryCoords():
 
 
 class GetPhotometry():
-    def __init__(self, graceid, ra, dec, jd, path_events_dictionary):
+    def __init__(self, ra, dec, jd, graceid, observing_run='O4c', path_events_dictionary='data', testing=False):
+        self.ra=ra
+        self.dec=dec
+        self.jd=jd
         self.graceid = graceid
-        self.ra = ra
-        self.dec = dec
-        self.jd = jd
+        self.observing_run = observing_run
         self.path_events_dictionary = path_events_dictionary
+        self.testing = testing
 
-    def submit_post(self):
-        ra = json.dumps(self.ra)
-        dec = json.dumps(self.dec)
-        jdstart = json.dumps(self.jd)   
+    def submit_post(self, ra, dec, jd):
+        ra = json.dumps(ra)
+        dec = json.dumps(dec)
+        jdstart = json.dumps(jd)   
         jdend = json.dumps(Time.now().jd)
         payload = {'ra': ra, 'dec': dec, 'jdstart': jdstart, 'jdend': jdend, 'email': email, 'userpass': userpass}
         # fixed IP address/URL where requests are submitted:
@@ -327,20 +345,21 @@ class GetPhotometry():
 
     def save_photometry_date(self):
         photometry_date = None
-        with open(f'{self.path_events_dictionary}/dicts/events_dict_O4b.json', 'r') as file:
+        with open(f'{self.path_events_dictionary}/dicts/events_dict_{self.observing_run}.json', 'r') as file:
             events_dict = json.load(file)
         if len(self.ra) == 0:
             zfps_date_dict = {self.graceid: 'NA'}  
         else:
             photometry_date = Time.now().iso    
-            zfps_date_dict = {self.graceid: photometry_date}  
+            zfps_date_dict = {self.graceid: photometry_date}
         for key, value in zfps_date_dict.items():
             if key in events_dict:
                 if 'flare' not in events_dict[key]:
                     events_dict[key]['flare'] = {}  
                 events_dict[key]['flare']['date_last_zfps'] = value
-                with open(f'{self.path_events_dictionary}/dicts/events_dict_O4b.json', 'w') as file:
-                    json.dump(events_dict, file)
+                if not self.testing:  
+                    with open(f'{self.path_events_dictionary}/dicts/events_dict_{self.observing_run}.json', 'w') as file:
+                        json.dump(events_dict, file)
             else:
                 print(f'{key} not in dictionary')
         return photometry_date
@@ -348,33 +367,41 @@ class GetPhotometry():
     def submit(self):
         if len(self.ra) == 0:
             print('no AGN to submit')
-            return None   
+            return None, None, None 
         elif any(isinstance(item, list) for item in self.ra):
             num_batches = len(self.ra)
             num_agn = sum([len(x) for x in self.ra])
-            print(f'submit in {num_batches} batches')
-            [self.submit_post(r, d, j) for r,d,j in zip(self.ra, self.dec, self.jd)]
+            if self.testing:
+                print('Testing mode - no submission')
+            else:
+                print(f'submit in {num_batches} batches')
+                [self.submit_post(r, d, j) for r,d,j in zip(self.ra, self.dec, self.jd)]
         else:
             num_batches = 1
             num_agn = len(self.ra)
-            print('submit in one batch')  
-            self.submit_post()         
-        photometry_date = self.submit_post(self.ra, self.dec, self.jd)
+            if self.testing:
+                print('Testing mode - no submission')
+            else:
+                print('submit in one batch')  
+                self.submit_post(self.ra, self.dec, self.jd)         
+        photometry_date = self.save_photometry_date()
+        if not self.testing:
+            print(f'Submitted {num_agn} AGN in {num_batches} batches at {photometry_date}')
         return photometry_date, num_agn, num_batches
 
 
 
 ### functions to save and inspect photometry
 
-
 class SavePhotometry():
-    def __init__(self, graceid, action, path_photometry, batch_codes=None, submission_date=None, num_batches_submitted=None):
+    def __init__(self, graceid, action, path_photometry, batch_codes=None, submission_date=None, num_batches_submitted=None, observing_run='O4c'):
         self.graceid = graceid
         self.batch_codes = batch_codes
         self.action = action
         self.path_photometry = path_photometry
         self.submission_date = submission_date
         self.num_batches_submitted = num_batches_submitted
+        self.observing_run = observing_run
     
     def get_coords_batchcode(self):
         """
@@ -404,7 +431,7 @@ class SavePhotometry():
         """
         load zfps table, get batch_codes, get coords, format filename given the graceid and submission date and number of batches
         """
-        with gzip.open(f'./bot/data/dicts/crossmatch_dict_O4b.gz', 'rb') as f:
+        with gzip.open(f'./bot/data/dicts/crossmatch_dict_{self.obsering_run}.gz', 'rb') as f:
             crossmatch_dict = pickle.load(f)
         action = 'Query Database'
         settings = {'email': email, 'userpass': userpass, 'option': 'All recent jobs', 'action': action}
@@ -432,8 +459,8 @@ class SavePhotometry():
             filtered_table = filtered_table.drop(columns=['matches_date'])
             print(f'{len(filtered_table)} coords found')
 
-            # check if we retrieved the same number of batches as submitted, if not likely not complete yet
-            # this will break when batch codes are > 5 digits
+            # check if we retrieved the same number of batches as submitted, if not, likely not complete yet
+            # TODO: this will break when batch codes are > 5 digits
             def extract_batch_code(lightcurve):
                 match = re.search(r'/(\d{5})/', lightcurve)
                 if match:
@@ -446,6 +473,7 @@ class SavePhotometry():
                 print(f'Returned {num_batches_received} batches for {self.num_batches_submitted} submitted')
                 return None
 
+        # need to do this because there is a slight difference between the coords submitted and those returned usually
         ra = filtered_table['ra'].tolist()
         dec = filtered_table['dec'].tolist()
         name = [str(r) + '_' + str(d) for r, d in zip(ra, dec)]
@@ -514,7 +542,7 @@ class SavePhotometry():
         else:
             # retrieve coords directly from graceid
             retrieved_photometry = self.get_coords_graceid()
-        if retrieved_photometry is None: # if not all batches are returned
+        if retrieved_photometry is None: # if not all batches are returned (could be partially returned)
             return None
         filename  = retrieved_photometry[1]
         if self.batch_codes == None:
@@ -568,12 +596,12 @@ class PhotometryLog():
         """
         check for events outside our 200 day window of observability
         """
-        for id in self.photometry_pipeline.keys():
-            if self.photometry_pipeline[id]['over_200_days'] or 'dateobs' not in self.photometry_pipeline[id]:
+        for id in self.photometry_pipeline['events'].keys():
+            if self.photometry_pipeline['events'][id]['over_200_days'] or 'dateobs' not in self.photometry_pipeline['events'][id]:
                 continue
-            dateobs = self.photometry_pipeline[id]['dateobs']
+            dateobs = self.photometry_pipeline['events'][id]['dateobs']
             if (Time.now() - Time(dateobs, format='isot')).value > 200:
-                self.photometry_pipeline[id]['over_200_days'] = True
+                self.photometry_pipeline['events'][id]['over_200_days'] = True
                 print(f'Event {id} is over 200 days old')
                 with open(self.path_pipeline, 'w') as file:
                     json.dump(self.photometry_pipeline, file, indent=4)
@@ -607,9 +635,12 @@ class PhotometryLog():
         """
         Add a new event to the photometry pipeline.
         """
-        if event_id not in self.photometry_pipeline:
-            self.photometry_pipeline[event_id] = event_data
-            num_agn = event_data['zfps']['num_agn_submitted']
+        if event_id not in self.photometry_pipeline['events']:
+            self.photometry_pipeline['events'][event_id] = event_data
+            try:
+                num_agn = event_data['zfps']['num_agn_submitted']
+            except:
+                num_agn=0
             self.update_summary_stats(number_requested=num_agn,number_saved=0,keyword='new_request')
             with open(self.path_pipeline, 'w') as file:
                 json.dump(self.photometry_pipeline, file, indent=4)
@@ -621,10 +652,10 @@ class PhotometryLog():
         """
         Add a new entry to the zfps list for a given event ID.
         """
-        if event_id in self.photometry_pipeline:
-            if 'zfps' not in self.photometry_pipeline[event_id]:
-                self.photometry_pipeline[event_id]['zfps'] = []
-            self.photometry_pipeline[event_id]['zfps'].append(new_entry)
+        if event_id in self.photometry_pipeline['events']:
+            if 'zfps' not in self.photometry_pipeline['events'][event_id]:
+                self.photometry_pipeline['events'][event_id]['zfps'] = []
+            self.photometry_pipeline['events'][event_id]['zfps'].append(new_entry)
             num_agn = new_entry['num_agn_submitted']
             self.update_summary_stats(number_requested=num_agn,number_saved=0,keyword='new_request')
             with open(self.path_pipeline, 'w') as file:
@@ -640,30 +671,30 @@ class PhotometryLog():
         first_update_request = []
         pending_request = []
         update_request = []
-        for id in self.photometry_pipeline.keys():
-            if self.photometry_pipeline[id]['over_200_days'] or 'dateobs' not in self.photometry_pipeline[id]:
+        for id in self.photometry_pipeline['events'].keys():
+            if self.photometry_pipeline['events'][id]['over_200_days'] or 'dateobs' not in self.photometry_pipeline['events'][id]:
                 continue
-            for x in self.photometry_pipeline[id]['zfps']:
-                if not x['complete']:
-                    pending_request.append(id, x['submission_date'], x['num_batches_submitted'])
-            dateobs = self.photometry_pipeline[id]['dateobs']
+            for x in self.photometry_pipeline['events'][id]['zfps']:
+                if type(x)!= str and not x['complete']:
+                    pending_request.append([id, x['submission_date'], x['num_batches_submitted']])
+            dateobs = self.photometry_pipeline['events'][id]['dateobs']
             time_delta = round((Time.now() - Time(dateobs, format='isot')).to_value('jd'))
-            # TODO this will break if we don't run one day, add check to ensure we dont miss any request?
+            # TODO this will break if we don't run one day, add check to ensure we dont miss any request
             if time_delta == 9:
                 first_update_request.append(id)
             if time_delta in [20, 30, 50, 100]:
                 update_request.append(id)
-        print(f'First update request: {first_update_request}')
-        print(f'Pending request: {pending_request}')
-        print(f'Update request: {update_request}')
+        print(f'First update request: {[x[0] for x in first_update_request]}')
+        print(f'Pending request: {[x[0] for x in pending_request]}')
+        print(f'Update request: {[x[0] for x in update_request]}')
         return first_update_request, update_request, pending_request
     
     def update_photometry_complete(self, event_id, submission_date, batch_ids, num_returned, num_broken):
         """
         Update the photometry status for a given event ID.
         """
-        if event_id in self.photometry_pipeline:
-            for x in self.photometry_pipeline[event_id]['zfps']:
+        if event_id in self.photometry_pipeline['events']:
+            for x in self.photometry_pipeline['events'][event_id]['zfps']:
                 if x['submission_date'] == submission_date:
                     x['complete'] = True
                     x['batch_ids'] = batch_ids
@@ -683,14 +714,15 @@ class PhotometryLog():
 
 
 class PlotPhotometry():
-    def __init__(self, graceid, path_events_dictionary, path_photometry):
+    def __init__(self, observing_run, graceid, path_events_dictionary, path_photometry):
+        self.observing_run = observing_run
         self.graceid = graceid
         self.path_events_dictionary = path_events_dictionary
         self.path_photometry = path_photometry
 
     def load_event_lightcurves_graceid(self):
         # open the stored event info
-        with gzip.open(f'{self.path_events_dictionary}/dicts/crossmatch_dict_O4b.gz', 'rb') as f:
+        with gzip.open(f'{self.path_events_dictionary}/dicts/crossmatch_dict_{self.observing_run}.gz', 'rb') as f:
             crossmatch_dict = pickle.load(f)
         coords = crossmatch_dict[self.graceid]['agn_catnorth']
         name = [str(x['ra']) + '_' + str(x['dec']) for x in coords]
@@ -703,7 +735,7 @@ class PlotPhotometry():
         batch_photometry_filtered = self.load_event_lightcurves_graceid()
         empty=[x for x in batch_photometry_filtered if x.empty]
         # open the stored event info
-        with open(f'{self.path_events_dictionary}/dicts/events_dict_O4b.json', 'r') as file:
+        with open(f'{self.path_events_dictionary}/dicts/events_dict_{self.observing_run}.json', 'r') as file:
             events_dict = json.load(file)
         total_matches=events_dict[self.graceid]['crossmatch']['n_agn_catnorth']
         dateobs=events_dict[self.graceid]['gw']['GW MJD']+ 2400000.5

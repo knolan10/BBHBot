@@ -26,17 +26,35 @@ from io import StringIO
 from io import BytesIO
 import yaml
 import subprocess
+from ligo.skymap.io import read_sky_map
+import ligo.skymap.plot
+import ligo.skymap.postprocess
 from ligo.gracedb.rest import GraceDb
 g = GraceDb()  
 from penquins import Kowalski
 
-#credentials
-with open('bot/FlareBotCredentials.yaml', 'r') as file:
-    credentials = yaml.safe_load(file)
-github_token = credentials['github_token']
+
+# credentials
+paths = ['FlareBotCredentials.yaml', 'bot/FlareBotCredentials.yaml']
+credentials = None
+for path in paths:
+    try:
+        with open(path, 'r') as file:
+            credentials = yaml.safe_load(file)
+            break  
+    except FileNotFoundError:
+        continue
+if credentials is None:
+    raise Exception("Credentials file not found in any of the specified paths. Check file paths.")
+print("Credentials file loaded successfully.")
+email = credentials['zfps_email']
+userpass = credentials['zfps_userpass']
+auth_username = credentials['zfps_auth']['username']
+auth_password = credentials['zfps_auth']['password'] 
+allocation= credentials['allocation']
+fritz_token = credentials['fritz_token']
 kowalski_password = credentials['kowalski_password']
-fritz_token = credentials['fritz_token']    
-allocation = credentials['allocation']  
+github_token= credentials['github_token']
 
 
 class GetSuperevents():
@@ -78,7 +96,6 @@ class GetSuperevents():
             for files, id in zip(event_files, ids)
         ]
         urls = [i + j for i, j in zip(superevent_files, file)]
-        [print(x) for x in urls if "none" in x]
         urls_save = [x for x in urls if "none" not in x]
         response = [requests.get(url).text for url in urls_save]
         return response
@@ -304,7 +321,7 @@ class Fritz():
         for x in error:
             index = x[0]
             event = self.eventid[index]
-            print(f'{event}: {x[1][1]}')
+            print(f'error: {event}: {x[1][1]}')
         maunual_edits = {
             "S240921cw": ['correct', 'not triggered', 0, 0, ''], # moon too close ?
             "S241125n": ['correct', 'triggered', 900, 0.5, ''], # the Swift/Bat coincident detection
@@ -367,6 +384,7 @@ class NewEventsToDict():
             'plan start': start, 
             'cadence': obs_cadence
             })
+        
         new_events_df['FAR (years/FA)'] = pd.to_numeric(new_events_df['FAR (years/FA)'], downcast='integer')
 
         new_events_df.set_index('graceids', inplace=True)
@@ -628,37 +646,15 @@ class KowalskiCrossmatch():
             return catnorth, quaia
 
 class PushEventsPublic():
-    def __init__(self, path_events_dictionary, runid='O4c', testing=False, verbose=True): 
+    def __init__(self, path_events_dictionary, path_events_summary, runid='O4c', testing=False, verbose=True): 
         self.path_events_dictionary = path_events_dictionary
+        self.path_events_summary = path_events_summary  
         self.runid = runid
         self.testing = testing
         self.verbose = verbose
 
-    def push_changes_to_repo(self):
-        dir_path = '../../events_summary'
-        commit_message = 'automated push of new events'
-        try:
-            remote_url = f'https://{github_token}@github.com/knolan10/BBHBot/events_summary'
-
-            subprocess.run(['git', '-C', dir_path, 'remote', 'set-url', 'origin', remote_url], check=True)
-
-            subprocess.run(['git', '-C', dir_path, 'add', '.'], check=True)
-
-            result = subprocess.run(['git', '-C', dir_path, 'status', '--porcelain'], capture_output=True, text=True)
-            if not result.stdout.strip():
-                print("No changes to commit. Pushing existing commits.")
-            else:
-                subprocess.run(['git', '-C', dir_path, 'commit', '-m', commit_message], check=True)
-
-            subprocess.run(['git', '-C', dir_path, 'push', 'origin', 'main'], check=True)
-            print("Changes pushed to the repository successfully.")
-        except subprocess.CalledProcessError as e:
-            print(f"An error occurred: {e}")
-            print(f"Error output: {e.stderr}")
-            print(f"An error occurred: {e}")
-
-    def plot_trigger_timeline():
-        trigger_df = pd.read_csv('../events_summary/trigger.md', delimiter='|', skipinitialspace=True).iloc[:, 1:-1]
+    def plot_trigger_timeline(self):
+        trigger_df = pd.read_csv(f'{self.path_events_summary}/trigger.md', delimiter='|', skipinitialspace=True).iloc[:, 1:-1]
         trigger_df = trigger_df.iloc[1:]
         trigger_df.columns = ['graceids', 'GW MJD', '90% Area (deg2)', '50% Area (deg2)',
                 'Distance (Gpc)', 'FAR (years/FA)', 'Mass (M_sol)', 'gcnids', 'time',
@@ -683,15 +679,71 @@ class PushEventsPublic():
         plt.ylim(0, 0.2)
         plt.show()
 
+    def push_changes_to_repo(self):
+        """
+        Push changes in the events_summary directory to the remote GitHub repository.
+        Args:
+            github_token (str): The GitHub token for authentication.
+        """
+        commit_message = 'automated push of new events'
+        try:
+            if not github_token:
+                raise ValueError("GitHub token is missing. Please provide a valid token.")
+            remote_url = f'https://{github_token}@github.com/knolan10/BBHBot.git'
+            # Resolve the repository root and events_summary path
+            repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'))
+            path_events_summary = os.path.abspath(os.path.join(repo_root, 'events_summary'))
+            # Set the remote URL for the repository
+            subprocess.run(['git', '-C', repo_root, 'remote', 'set-url', 'origin', remote_url], check=True)
+            # Stage changes in the events_summary directory
+            subprocess.run(['git', '-C', repo_root, 'add', path_events_summary], check=True)
+            # Check the status of the repository
+            result = subprocess.run(['git', '-C', repo_root, 'status', '--porcelain'], capture_output=True, text=True)
+            # Commit changes if there are any
+            if not result.stdout.strip():
+                print("No changes to commit.")
+            else:
+                subprocess.run(['git', '-C', repo_root, 'commit', '-m', commit_message], check=True)
+            # Check for new commits to push
+            push_check = subprocess.run(['git', '-C', repo_root, 'log', 'origin/main..HEAD'], capture_output=True, text=True)
+            if not push_check.stdout.strip():
+                print("No new commits to push. Repository is up to date.")
+            else:
+                # Push changes to the remote repository
+                subprocess.run(['git', '-C', repo_root, 'push', 'origin', 'main'], check=True)
+                print("Changes pushed to the repository successfully.")
+        except subprocess.CalledProcessError as e:
+            print(f"An error occurred while running a git command: {e}")
+            print(f"Command: {e.cmd}")
+            print(f"Return code: {e.returncode}")
+            print(f"Error output: {e.stderr.decode('utf-8') if e.stderr else 'No error output'}")
+        except ValueError as ve:
+            print(f"Error: {ve}")
+        except Exception as ex:
+            print(f"An unexpected error occurred: {ex}")
+
     def format_and_push(self):
-        with open(f'{self.path_events_dictionary}/dicts/events_dict_{self.runid}.json', 'r') as file:
-            events_dict_add = json.load(file)
+        # get events from multiple runs (we present a single markdown file for trigger and error trigger)
+        events_dict_add = {}
+        # TODO: make a "maintenance" doc and note that new runids should be added as they start
+        for rid in ['O4c', 'O4b']: # runids for BBHBOT trigger operation
+            file_path = f'{self.path_events_dictionary}/dicts/events_dict_{rid}.json'
+            with open(file_path, 'r') as file:
+                events_dict_add.update(json.load(file))  # Combine dictionaries
+        # get just events for the specified run
+        file_path = f'{self.path_events_dictionary}/dicts/events_dict_{self.runid}.json'
+        with open(file_path, 'r') as file:
+            current_run_dict = json.load(file)
+        current_run_ids = list(set(current_run_dict.keys()))
         # convert back to df
         restructured_dict = {key: {'graceids': key, **value['gw']} for key, value in events_dict_add.items()}
         df_full = pd.DataFrame.from_dict(restructured_dict, orient='index')
         df_full = df_full.reset_index(drop=True)
-        trigger_plan = json_normalize(df_full['trigger plan'])
-        df_full = pd.concat([df_full, trigger_plan], axis=1)
+        if 'trigger plan' in df_full.columns:
+            trigger_plan = json_normalize(df_full['trigger plan'])
+            df_full = pd.concat([df_full, trigger_plan], axis=1)
+        else:
+            df_full['trigger plan'] = None
         # make gracids into links
         gracedbids = df_full['graceids']
         gracedb_urls = [f'https://gracedb.ligo.org/superevents/{id}/view/' for id in gracedbids]
@@ -703,7 +755,7 @@ class PushEventsPublic():
         fritz_links = [f'[{id}]({url})' for id, url in zip(fritzids, fritz_urls)]
         df_full['gcnids'] = fritz_links
         #remove trigger_plan, gcnids
-        df = df_full.drop(columns=['trigger plan', 'gcnids', 'time', 'probability', 'start', 'cadence'])
+        df = df_full.drop(columns=[col for col in ['trigger plan', 'gcnids', 'time', 'probability', 'start', 'cadence'] if col in df_full.columns])
         # put newest events at the top
         df = df.sort_values(by='GW MJD', ascending=False)
         df = df.reset_index(drop=True)
@@ -714,7 +766,10 @@ class PushEventsPublic():
         df.loc[df['graceids'].str.contains('S241130n'), 'comments'] = 'sun too close'
 
         # priority df
-        df_priority = df_full.drop(columns=[col for col in ['trigger plan', 'cadence', 'start'] if col in df_full.columns])
+        df_priority = df_full[df_full['graceids'].isin(current_run_ids)]
+        df_priority = df_full[df_full['graceids'].str.contains('|'.join(current_run_ids), na=False)]
+
+        df_priority = df_priority.drop(columns=[col for col in ['trigger plan', 'cadence', 'start'] if col in df_priority.columns])
         confident = df_priority[df_priority['FAR (years/FA)'] > 10] #FAR is in units of years per false alert 
         high_mass = df_priority[df_priority['Mass (M_sol)'] > 60]
         low_area = df_priority[df_priority['90% Area (deg2)'] < 1000]
@@ -737,7 +792,8 @@ class PushEventsPublic():
 
         # trigger df
         trigger_df = df_full[df_full['trigger'] == 'triggered']
-        trigger_df = trigger_df.drop(columns=['trigger', 'trigger plan'])
+        trigger_df = trigger_df.drop(columns=[col for col in ['trigger', 'trigger plan'] if col in trigger_df.columns])
+
         trigger_df = trigger_df.iloc[::-1].reset_index(drop=True)
         trigger_df = trigger_df.reset_index(drop=True)
         #manual edits
@@ -752,7 +808,8 @@ class PushEventsPublic():
                          (df_full['trigger'] == 'nan') |
                          (df_full['trigger'] == 'no plan') |
                          (df_full['trigger'] == 'no valid plan')]
-        error_triggers = error_triggers.drop(columns=['trigger', 'trigger plan', 'cadence'])
+        error_triggers = error_triggers.drop(columns=[col for col in ['trigger', 'trigger plan', 'cadence'] if col in error_triggers.columns])
+
         error_triggers = error_triggers.iloc[::-1].reset_index(drop=True)
         error_triggers = error_triggers.reset_index(drop=True)
         #manual edits
@@ -762,6 +819,9 @@ class PushEventsPublic():
         error_triggers['comments'] = 'fails mass criteria'
         error_triggers['comments'] = 'fails mass criteria'
         error_triggers.loc[error_triggers['GW MJD'] == 60694, 'comments'] = 'plan has zero observations'
+
+        # now reduce df to just the current observing run
+        df = df[df['graceids'].str.contains('|'.join(current_run_ids), na=False)]
 
         # format to push to repo
         df = df.fillna('')
@@ -775,13 +835,12 @@ class PushEventsPublic():
         markdown_table_trigger = trigger_df.to_markdown(index=False)
         markdown_table_error_triggers = error_triggers.to_markdown(index=False)
         if not self.testing:
-            summary_dir = '../../events_summary'
-            os.makedirs(summary_dir, exist_ok=True) 
+            os.makedirs(self.path_events_summary, exist_ok=True) 
             files_to_write = {
-                f'{summary_dir}/{self.runid}.md': markdown_table,
-                f'{summary_dir}/{self.runid}_priority.md': markdown_table_priority,
-                f'{summary_dir}/trigger.md': markdown_table_trigger,
-                f'{summary_dir}/error_trigger.md': markdown_table_error_triggers,
+                f'{self.path_events_summary}/{self.runid}.md': markdown_table,
+                f'{self.path_events_summary}/{self.runid}_priority.md': markdown_table_priority,
+                f'{self.path_events_summary}/trigger.md': markdown_table_trigger,
+                f'{self.path_events_summary}/error_trigger.md': markdown_table_error_triggers,
             }
             for file_path, content in files_to_write.items():
                 if not os.path.exists(file_path):
@@ -790,3 +849,87 @@ class PushEventsPublic():
             self.push_changes_to_repo()
 
         return df, priority, trigger_df, error_triggers
+    
+
+class PlotSkymap():
+    def __init__(self, gracedbid, path_events_dictionary='bot/data', runid='O4c', catalog='agn_catnorth'): 
+        self.gracedbid = gracedbid
+        self.path_events_dictionary = path_events_dictionary
+        self.runid = runid
+        self.catalog = catalog
+ 
+    def load_agn_crossmatches(self):    
+        with gzip.open(f'{self.path_events_dictionary}/dicts/crossmatch_dict_{self.runid}.gz', 'rb') as f:
+            crossmatch_dict = pickle.load(f)
+            agn = crossmatch_dict[self.gracedbid][self.catalog]
+            ra = [x['ra'] for x in agn]
+            dec = [x['dec'] for x in agn]
+            return ra, dec
+
+    def get_moc(self):
+        event_files = g.files(self.gracedbid).json() 
+        mocs = [k for k in list(event_files) if 'multiorder' in k]
+        if not mocs:
+            url = 'none'
+            print(self.gracedbid)
+        else:
+            if any('LALInference' in item for item in mocs):
+                mocs = [k for k in mocs if 'LALInference' in k]
+            key = [mocs if len(mocs) == 1 
+                else list(filter(lambda k: '2' in k, mocs))[0] if list(filter(lambda k: '2' in k, mocs)) 
+                else list(filter(lambda k: '1' in k, mocs))[0] if list(filter(lambda k: '1' in k, mocs))
+                else 'LALInference.multiorder.fits' if 'LALInference.multiorder.fits' in mocs
+                else list(filter(lambda k: '0' in k, mocs))[0] if list(filter(lambda k: '0' in k, mocs))
+                else mocs[0]]
+            
+            url = event_files[key[0]]
+            skymap = read_sky_map(url)[0]
+            return skymap
+        
+    def plot(self, RA_unit="hours", show_contour=False, show_agn=True):
+        """
+        Plot skymaps
+
+        Parameters
+        ----------
+        skymaps : list of skymaps
+        RA_unit : unit for the right ascension, either hours or degrees
+        """
+        skymap = self.get_moc()
+        fig = plt.figure(figsize=(10, 5))
+        if RA_unit == "degrees":
+            ax = plt.axes(projection='astro degrees mollweide')
+        elif RA_unit == "hours":
+            ax = plt.axes(projection='astro hours mollweide')
+        else:
+            raise ValueError("Does not understand {}".format(RA_unit))
+        ax.grid()
+        ax.imshow_hpx(skymap, cmap='Blues')
+        if show_contour:
+            contour = ax.contour_hpx((ligo.skymap.postprocess.util.find_greedy_credible_levels(skymap), 'ICRS'), 
+                                    levels=[0.9], 
+                                    linewidths=1, 
+                                    nested=True, 
+                                    colors='blue')
+        if show_agn:
+            ra, dec = self.load_agn_crossmatches()
+            ax.plot(ra, dec, 'o', color='orange', markersize=0.02, transform=ax.get_transform('world'))
+        plt.title(self.gracedbid)
+        plt.show()
+
+class VisualizePop():
+    def __init__(self, path_events_dictionary='bot/data', runid='O4c'): 
+        self.path_events_dictionary = path_events_dictionary
+        self.runid = runid
+    # TODO: make this work for multiple runs
+    
+    def plot_masses(self):
+        with open(f'{self.path_events_dictionary}/dicts/events_dict_{self.runid}.json', 'r') as file:
+            events_dict_add = json.load(file)
+        masses = [event['gw']['Mass (M_sol)'] for event in events_dict_add.values() if 'gw' in event and 'Mass (M_sol)' in event['gw']]
+        plt.hist(masses, bins=30, color='#040348', edgecolor='black')
+        plt.title(f'{self.runid} Significant BBH Mass Distribution', fontsize=20)
+        plt.xlabel(f'Mass (M$_{{\\odot}}$)', fontsize=18)
+        plt.ylabel('Count', fontsize=18)
+        plt.tick_params(axis='both', which='major', labelsize=16)
+        plt.show()

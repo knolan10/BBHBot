@@ -228,15 +228,28 @@ def get_plan_stats(gcnevent_id, queuename, token, mode):
         total_time = stats[0]['statistics']['total_time']
         probability = stats[0]['statistics']['probability']
         start_observation = stats[0]['statistics']['start_observation']
-        observation_plan_id = stats[0]['observation_plan_id']
+        observation_plan_request_id = generated_plan[0]['id']
         print(f'Total time: {total_time}, probability: {probability}')
-        return past_submission, total_time, probability, start_observation, observation_plan_id
+        return past_submission, total_time, probability, start_observation, observation_plan_request_id
 
     except MyException as e:
         print(f'error: {e}')
         return None
 
-# kowalski api call to check current observing queue
+
+def get_kowalski_ztf_queue(token, allocation):
+    """
+    check current items in the ZTF observing queue
+    """
+    headers = {'Authorization': f'token {token}'}
+    endpoint = f'https://fritz.science/api/observation/external_api/{allocation}?queuesOnly=true'
+    response = requests.request('GET', endpoint, headers=headers)
+    if response.status_code != 200:   
+        raise Exception(f'API call to ZTF queue failed')         
+    json_string = response.content.decode('utf-8')
+    json_data = json.loads(json_string)
+    return json_data
+
 def query_kowalski_ztf_queue(keywords, token, allocation):
     """
     check current items in the ZTF observing queue and wordsearch for keywords from our event
@@ -254,7 +267,6 @@ def query_kowalski_ztf_queue(keywords, token, allocation):
             if keyword in name:
                 return 'Already Submitted'
     return None
-
 
 def trigger_ztf(plan_request_id, token, mode):
     """
@@ -322,9 +334,23 @@ def check_triggered_csv(superevent_id):
         trigger_plan_id = None
     return triggered, trigger_plan_id
 
-def update_trigger_log(superevent_id_to_check, column, value):
+def update_trigger_log(superevent_id_to_check, column, value, append_string=False, remove_string=False):
     df = pd.read_csv('./data/triggered_events.csv')
-    df.loc[df['superevent_id'] == superevent_id_to_check, column] = value
+    if append_string:
+        current_value = df.loc[df['superevent_id'] == superevent_id_to_check, column].values[0]
+        separator = ','
+        if type(current_value)!= str:
+            current_value = ''
+            separator = ''
+        df.loc[df['superevent_id'] == superevent_id_to_check, column] = current_value+separator+value
+    elif remove_string:
+        current_value = df.loc[df['superevent_id'] == superevent_id_to_check, column].values[0]
+        if type(current_value)!= str:
+            raise MyException(f'error removing {value} from {superevent_id_to_check} - not a string')
+        new_value = current_value.replace(value + ",", "").replace("," + value, "").replace(value, "")
+        df.loc[df['superevent_id'] == superevent_id_to_check, column] = new_value
+    else:
+        df.loc[df['superevent_id'] == superevent_id_to_check, column] = value
     df.to_csv('./data/triggered_events.csv', index=False)
 
 def add_triggercsv(superevent_id, dateobs, gcn_type, gcnid, localizationid, queued_plan, trigger_cadence, valid):
