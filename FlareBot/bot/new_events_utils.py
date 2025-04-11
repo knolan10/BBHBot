@@ -416,7 +416,11 @@ class NewEventsToDict():
                 events_dict_add[key]['gw']['trigger plan']['start'] = new_events_df.at[key, 'plan start'] if 'plan start' in new_events_df.columns else ''
                 events_dict_add[key]['gw']['trigger plan']['cadence'] = new_events_df.at[key, 'cadence'] if 'cadence' in new_events_df.columns else ''
 
-        if not self.check_before_run:
+        if len(new_events_df) == 0:
+            print('No new events to add')
+            return None
+        
+        if self.check_before_run:
             save = input("Save dictionary with new events added? (yes/no): ").strip().lower()
             if save == 'yes':
                 with open(f'{self.path_events_dictionary}/dicts/events_dict_{self.runid}.json', 'w') as file:
@@ -680,7 +684,7 @@ class PushEventsPublic():
         plt.ylim(0, 0.2)
         plt.show()
 
-    def push_changes_to_repo(self):
+    def push_changes_to_repo(self, github_token):
         """
         Push changes in the events_summary directory to the remote GitHub repository.
         Args:
@@ -695,17 +699,24 @@ class PushEventsPublic():
             # Resolve the repository root and events_summary path
             repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'))
             path_events_summary = os.path.abspath(os.path.join(repo_root, 'events_summary'))
+            
             # Set the remote URL for the repository
             subprocess.run(['git', '-C', repo_root, 'remote', 'set-url', 'origin', remote_url], check=True)
+            
             # Stage changes in the events_summary directory
             subprocess.run(['git', '-C', repo_root, 'add', path_events_summary], check=True)
-            # Check the status of the repository
+            
+            # Check the status of the repository, filtering for changes in events_summary
             result = subprocess.run(['git', '-C', repo_root, 'status', '--porcelain'], capture_output=True, text=True)
-            # Commit changes if there are any
-            if not result.stdout.strip():
-                print("No changes to commit.")
+            changes = [line for line in result.stdout.splitlines() if line.startswith('A ') or line.startswith('M ') or line.startswith('D ')]
+            changes_in_summary = [line for line in changes if line.endswith(path_events_summary)]
+            
+            # Commit changes if there are any in the events_summary directory
+            if not changes_in_summary:
+                print("No changes to commit in the events_summary directory.")
             else:
                 subprocess.run(['git', '-C', repo_root, 'commit', '-m', commit_message], check=True)
+                
                 # Check for new commits to push
                 push_check = subprocess.run(['git', '-C', repo_root, 'log', 'origin/main..HEAD'], capture_output=True, text=True)
                 if not push_check.stdout.strip():
@@ -844,7 +855,7 @@ class PushEventsPublic():
             for file_path, content in files_to_write.items():
                 with open(file_path, 'w') as f:
                     f.write(content)
-            self.push_changes_to_repo()
+            self.push_changes_to_repo(github_token)
 
         return df, priority, trigger_df, error_triggers
 
