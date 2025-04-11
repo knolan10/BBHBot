@@ -1,7 +1,7 @@
 {
     "summary_stats": {
-        "total_requests": 0,
-        "total_currently_pending": 0,
+        "total_requests": 12560,
+        "total_currently_pending": 12560,
         "total_saved": 0
     },
     "events": {
@@ -66,6 +66,18 @@
                     "number_returned": null,
                     "number_broken_urls": null,
                     "complete": false
+                },
+                {
+                    "catalog": "catnorth",
+                    "submission_date": "2025-04-11 23:01:30.994",
+                    "action": "new",
+                    "num_agn_submitted": 3140,
+                    "num_batches_submitted": 3,
+                    "batch_ids": null,
+                    "number_returned": null,
+                    "number_broken_urls": null,
+                    "complete": false,
+                    "from_queue": true
                 }
             ]
         }

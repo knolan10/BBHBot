@@ -315,8 +315,20 @@ class PhotometryCoords():
                     jd = data.get("jd")
                     number_to_submit = data.get("number_to_submit")
                     action = data.get("action")
-                    photometry_data.append((id, ra, dec, jd, number_to_submit, action))
+                    photometry_data.append((id, ra, dec, jd, number_to_submit, action, file_name))
         return photometry_data
+    
+    def move_complete_queued_photometry(file_name, path_queued_photometry, path_complete_queued_photometry):
+        """
+        Move the file to a different directory
+        """
+        source_path = os.path.join(path_queued_photometry, file_name)
+        destination_path = os.path.join(path_complete_queued_photometry, file_name)
+        if os.path.exists(source_path):
+            os.rename(source_path, destination_path)
+            print(f"Moved {file_name} to {path_complete_queued_photometry}")
+        else:
+            print(f"{file_name} not found in {path_queued_photometry}")
 
 
 class GetPhotometry():
