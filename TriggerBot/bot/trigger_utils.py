@@ -342,6 +342,7 @@ def update_trigger_log(superevent_id_to_check, column, value, append_string=Fals
         if type(current_value)!= str:
             current_value = ''
             separator = ''
+        df['superevent_id'] = df['superevent_id'].astype('object')
         df.loc[df['superevent_id'] == superevent_id_to_check, column] = current_value+separator+value
     elif remove_string:
         current_value = df.loc[df['superevent_id'] == superevent_id_to_check, column].values[0]
@@ -402,7 +403,7 @@ def send_email(sender_email, sender_password, recipient_emails, subject, body):
 
 def send_trigger_email(credentials, subject_message, dateobs):
     sender_email = credentials['sender_email']
-    sender_password = credentials['sender_password']
+    sender_password = credentials['sender_app_password']
     recipient_emails = credentials['recipient_emails']
     subject = subject_message
     fritz_url = f'https://fritz.science/gcn_events/{dateobs}'

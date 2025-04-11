@@ -21,6 +21,7 @@ import json
 import glob
 from bs4 import BeautifulSoup
 import os
+import logging
 import io
 from io import StringIO
 from io import BytesIO
@@ -66,9 +67,9 @@ class GetSuperevents():
         self.kafka_response = kafka_response
         self.retrieve_all = retrieve_all
 
-    # todo : cut unused params returned
-    # todo : add a date to the gracedb query so we aren't getting all of 04b
-    # todo : add option to update all events, ie with update alerts
+    # TODO : cut unused params returned
+    # TODO : add a date to the gracedb query so we aren't getting all of 04b/O4c etc
+    # TODO : add option to update all events, ie to catch update alerts
     
     """
     get new events that haven't been processed yet
@@ -190,7 +191,7 @@ class GetSuperevents():
         gcn_params = [self.get_params(url) for url in response]
         low_prob_bbh = [x for x in gcn_params if x[7] < 0.5 or x[8] > 0.3]
         params = [x for x in gcn_params if x[7] > 0.5 and x[8] < 0.3]
-        print(f'{len(params)} events (cut {len(low_prob_bbh)} low prob bbh events)')
+        print(f'{len(params)} new events to process (cut {len(low_prob_bbh)} low prob bbh events)')
         skymap_urls = [x[10] for x in params]
         skymap_data = [self.extract_skymap_params(url) for url in skymap_urls]
         # mass
@@ -453,7 +454,7 @@ class KowalskiCrossmatch():
                 "host": "kowalski.caltech.edu",
                 "protocol": "https",
                 "port": 443,
-                "username": "knolan",
+                "username": "knolan", #TODO: add to credentials
                 "password": self.kowalski_password,
                 "timeout": 6000
             },
@@ -462,7 +463,7 @@ class KowalskiCrossmatch():
                 "host": "gloria.caltech.edu",
                 "protocol": "https",
                 "port": 443,
-                "username": "knolan",
+                "username": "knolan", # TODO
                 "password": self.kowalski_password,
                 "timeout": 6000
             }
@@ -689,29 +690,35 @@ class PushEventsPublic():
         try:
             if not github_token:
                 raise ValueError("GitHub token is missing. Please provide a valid token.")
+            
             remote_url = f'https://{github_token}@github.com/knolan10/BBHBot.git'
             # Resolve the repository root and events_summary path
             repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'))
             path_events_summary = os.path.abspath(os.path.join(repo_root, 'events_summary'))
+            
             # Set the remote URL for the repository
             subprocess.run(['git', '-C', repo_root, 'remote', 'set-url', 'origin', remote_url], check=True)
+            
             # Stage changes in the events_summary directory
             subprocess.run(['git', '-C', repo_root, 'add', path_events_summary], check=True)
+            
             # Check the status of the repository
             result = subprocess.run(['git', '-C', repo_root, 'status', '--porcelain'], capture_output=True, text=True)
+            
             # Commit changes if there are any
             if not result.stdout.strip():
                 print("No changes to commit.")
             else:
                 subprocess.run(['git', '-C', repo_root, 'commit', '-m', commit_message], check=True)
-            # Check for new commits to push
-            push_check = subprocess.run(['git', '-C', repo_root, 'log', 'origin/main..HEAD'], capture_output=True, text=True)
-            if not push_check.stdout.strip():
-                print("No new commits to push. Repository is up to date.")
-            else:
-                # Push changes to the remote repository
-                subprocess.run(['git', '-C', repo_root, 'push', 'origin', 'main'], check=True)
-                print("Changes pushed to the repository successfully.")
+                
+                # Check for new commits to push
+                push_check = subprocess.run(['git', '-C', repo_root, 'log', 'origin/main..HEAD'], capture_output=True, text=True)
+                if not push_check.stdout.strip():
+                    print("No new commits to push. Repository is up to date.")
+                else:
+                    # Push changes to the remote repository
+                    subprocess.run(['git', '-C', repo_root, 'push', 'origin', 'main'], check=True)
+                    print("Changes pushed to the repository successfully.")
         except subprocess.CalledProcessError as e:
             print(f"An error occurred while running a git command: {e}")
             print(f"Command: {e.cmd}")
@@ -754,21 +761,20 @@ class PushEventsPublic():
         fritz_urls = [f'https://fritz.science/gcn_events/{id}' for id in fritzids]
         fritz_links = [f'[{id}]({url})' for id, url in zip(fritzids, fritz_urls)]
         df_full['gcnids'] = fritz_links
+        # put newest events at the top
+        df_full = df_full.sort_values(by='GW MJD', ascending=False)
+        df_full = df_full.reset_index(drop=True)
         #remove trigger_plan, gcnids
         df = df_full.drop(columns=[col for col in ['trigger plan', 'gcnids', 'time', 'probability', 'start', 'cadence'] if col in df_full.columns])
-        # put newest events at the top
-        df = df.sort_values(by='GW MJD', ascending=False)
-        df = df.reset_index(drop=True)
         #custom comments
+        # TODO: put this in maintenence doc
         df['comments'] = ''
         df.loc[df['graceids'].str.contains('S240921cw'), 'comments'] = 'moon too close'
         df.loc[df['graceids'].str.contains('S241125n'), 'comments'] = 'Swift/Bat coincident detection'
         df.loc[df['graceids'].str.contains('S241130n'), 'comments'] = 'sun too close'
 
         # priority df
-        df_priority = df_full[df_full['graceids'].isin(current_run_ids)]
-        df_priority = df_full[df_full['graceids'].str.contains('|'.join(current_run_ids), na=False)]
-
+        df_priority = df[df['graceids'].str.contains('|'.join(current_run_ids), na=False)]
         df_priority = df_priority.drop(columns=[col for col in ['trigger plan', 'cadence', 'start'] if col in df_priority.columns])
         confident = df_priority[df_priority['FAR (years/FA)'] > 10] #FAR is in units of years per false alert 
         high_mass = df_priority[df_priority['Mass (M_sol)'] > 60]
@@ -777,25 +783,23 @@ class PushEventsPublic():
         priority = pd.merge(highmass_lowarea, confident)
         if self.verbose:
             print(f'{len(priority)} {self.runid} events with FAR > 10 and mass > 60 and area < 1000 sq deg')
-        priority = priority.sort_values(by='GW MJD', ascending=False)
-        priority = priority.reset_index(drop=True)
         # #manual edits
         priority.loc[priority['GW MJD'] == 60572, 'gcnids'] = '[2024-09-19T06:15:59](https://fritz.science/gcn_events/2024-09-19T06:15:59)'
         # #add comments
+        # TODO: add to maintenance doc
         priority['comments'] = ''
         priority.loc[priority['graceids'].str.contains('S241210cw'), 'comments'] = 'Sun too close'
         priority.loc[priority['graceids'].str.contains('S241130n'), 'comments'] = 'Sun too close'
         priority.loc[priority['graceids'].str.contains('S241129aa'), 'comments'] = 'Southern target'
         priority.loc[priority['graceids'].str.contains('S240924a'), 'comments'] = 'Southern target'
         #remove nan gcnids
-        priority['gcnids'] = priority['gcnids'].apply(lambda x: '' if 'nan' in x else x)
-
+        priority['gcnids'] = priority['gcnids'].apply(lambda x: '' if isinstance(x, str) and 'nan' in x else x)
         # trigger df
         trigger_df = df_full[df_full['trigger'] == 'triggered']
         trigger_df = trigger_df.drop(columns=[col for col in ['trigger', 'trigger plan'] if col in trigger_df.columns])
-
-        trigger_df = trigger_df.iloc[::-1].reset_index(drop=True)
-        trigger_df = trigger_df.reset_index(drop=True)
+        # TODO: remove?
+        # trigger_df = trigger_df.iloc[::-1].reset_index(drop=True)
+        # trigger_df = trigger_df.reset_index(drop=True)
         #manual edits
         trigger_df.loc[trigger_df['GW MJD'] == 60572, 'gcnids'] = '[2024-09-19T06:15:59](https://fritz.science/gcn_events/2024-09-19T06:15:59)'
         #add comments
@@ -809,9 +813,9 @@ class PushEventsPublic():
                          (df_full['trigger'] == 'no plan') |
                          (df_full['trigger'] == 'no valid plan')]
         error_triggers = error_triggers.drop(columns=[col for col in ['trigger', 'trigger plan', 'cadence'] if col in error_triggers.columns])
-
-        error_triggers = error_triggers.iloc[::-1].reset_index(drop=True)
-        error_triggers = error_triggers.reset_index(drop=True)
+        #TODO: remove?
+        # error_triggers = error_triggers.iloc[::-1].reset_index(drop=True)
+        # error_triggers = error_triggers.reset_index(drop=True)
         #manual edits
         error_triggers.loc[error_triggers['GW MJD'] == 60573, 'gcnids'] = '[2024-09-20T07:34:24](https://fritz.science/gcn_events/2024-09-20T07:34:24)'
         error_triggers.loc[error_triggers['GW MJD'] == 60568, 'gcnids'] = '[2024-09-15T10:51:51](https://fritz.science/gcn_events/2024-09-15T10:51:51)'
@@ -843,13 +847,12 @@ class PushEventsPublic():
                 f'{self.path_events_summary}/error_trigger.md': markdown_table_error_triggers,
             }
             for file_path, content in files_to_write.items():
-                if not os.path.exists(file_path):
-                    with open(file_path, 'w') as f:
-                        f.write(content)
+                with open(file_path, 'w') as f:
+                    f.write(content)
             self.push_changes_to_repo()
 
         return df, priority, trigger_df, error_triggers
-    
+
 
 class PlotSkymap():
     def __init__(self, gracedbid, path_events_dictionary='bot/data', runid='O4c', catalog='agn_catnorth'): 
@@ -921,15 +924,41 @@ class VisualizePop():
     def __init__(self, path_events_dictionary='bot/data', runid='O4c'): 
         self.path_events_dictionary = path_events_dictionary
         self.runid = runid
-    # TODO: make this work for multiple runs
-    
+
     def plot_masses(self):
-        with open(f'{self.path_events_dictionary}/dicts/events_dict_{self.runid}.json', 'r') as file:
-            events_dict_add = json.load(file)
-        masses = [event['gw']['Mass (M_sol)'] for event in events_dict_add.values() if 'gw' in event and 'Mass (M_sol)' in event['gw']]
-        plt.hist(masses, bins=30, color='#040348', edgecolor='black')
-        plt.title(f'{self.runid} Significant BBH Mass Distribution', fontsize=20)
-        plt.xlabel(f'Mass (M$_{{\\odot}}$)', fontsize=18)
+        # Ensure runid is a list for consistent processing
+        if not isinstance(self.runid, list):
+            self.runid = [self.runid]
+        colors = ['#040348', '#FF5733', '#33FF57']  
+        color_cycle = iter(colors) 
+        plt.figure(figsize=(10, 6))  
+        bin_edges = None
+        stacked_heights = None
+        for run in self.runid:
+            try:
+                # Load the events dictionary for the current runid
+                with open(f'{self.path_events_dictionary}/dicts/events_dict_{run}.json', 'r') as file:
+                    events_dict_add = json.load(file)
+                # Extract masses
+                masses = [event['gw']['Mass (M_sol)'] for event in events_dict_add.values() 
+                          if 'gw' in event and 'Mass (M_sol)' in event['gw']]
+                # Compute histogram data
+                counts, bins = np.histogram(masses, bins=30, range=(min(masses), max(masses)))
+                # Initialize bin_edges and stacked_heights on the first iteration
+                if bin_edges is None:
+                    bin_edges = bins
+                    stacked_heights = np.zeros_like(counts)
+                color = next(color_cycle, np.random.rand(3,))  # Use predefined color or random if exhausted
+                plt.bar(bin_edges[:-1], counts, width=np.diff(bin_edges), bottom=stacked_heights, 
+                        color=color, edgecolor='black', label=f'{run}', align='edge')
+                stacked_heights += counts
+            except FileNotFoundError:
+                print(f"File for runid {run} not found. Skipping.")
+            except Exception as e:
+                print(f"Error processing runid {run}: {e}. Skipping.")
+        plt.title('Significant BBH Mass Distribution', fontsize=20)
+        plt.xlabel('Mass (M$_{\\odot}$)', fontsize=18)
         plt.ylabel('Count', fontsize=18)
         plt.tick_params(axis='both', which='major', labelsize=16)
+        plt.legend(fontsize=14)
         plt.show()

@@ -14,22 +14,24 @@ path_photometry = '../../../../data/bbh/ZFPS/'
 mlp_modelpath = 'mlp_model.sav' 
 path_photometry_pipeline = 'data/photometry_pipeline.json'
 # mode (testing means don't push results, dont request forced photometry)
-testing = True  
+testing = False  
 do_photometry = True # this flag will be changed to false if we hit the 15000 request limit
 
 
 # Part 0 : load current photometry status
-print("-----------------------PART 0: Loading current photometry status-----------------------")
+print("----------------------------PART 0: Address pending requests----------------------------")
 followup = PhotometryLog(path_photometry_pipeline)
 followup.check_completed_events()
 # events that need updated ZFPS (first update 9 days in, followed by cadence) or have pending requests that haven't returned/saved
 first_update, update, pending = followup.check_photometry_status()
 
-#TODO: is this function acting as desired?
+#TODO: write a direct query to ZFPS to check number of pending requests, don't rely on local number stored over months
 number_pending_requests = followup.check_number_pending()
 
 if number_pending_requests > 15000:
     do_photometry = False
+
+# TODO: check pending requests here
 
 
 ###Part 1 : injest new events
@@ -72,71 +74,71 @@ matches = crossmatch.get_crossmatches()
 df, priority, trigger_df, error_triggers = PushEventsPublic(path_events_dictionary,
                                                             path_events_summary,
                                                             runid='O4c',
-                                                            testing=False, 
+                                                            testing=testing, 
                                                             verbose=True).format_and_push()
 
-# for triggered events, request the baseline forced photometry for all AGN with no locally save photometry
-for id, date, trigger in zip(eventid, dateobs, trigger_status):
-    if trigger[0] == 'correct' and trigger[1] != 'triggered':
-        print(f"no trigger, so not ZFPS request for {id}")
-        continue
-    if trigger[0]!='correct' or trigger[1] != 'triggered':
-        print(f"inspecting event {id} for trigger status: {trigger}")
-        zfps = "did not make new request"
-        continue  
-    print(f"Submitting new photometry request for event {id}")
-    coords = PhotometryCoords(action='new', 
-                                graceid=id, 
-                                catalog='catnorth', 
-                                verbose=True,
-                                path_events_dictionary=path_events_dictionary,
-                                path_photometry=path_photometry,
-                                observing_run='O4c')
+# # for triggered events, request the baseline forced photometry for all AGN with no locally save photometry
+# for id, date, trigger in zip(eventid, dateobs, trigger_status):
+#     if trigger[0] == 'correct' and trigger[1] != 'triggered':
+#         print(f"no trigger, so not ZFPS request for {id}")
+#         continue
+#     if trigger[0]!='correct' or trigger[1] != 'triggered':
+#         print(f"inspecting event {id} for trigger status: {trigger}")
+#         zfps = "did not make new request"
+#         continue  
+#     print(f"Submitting new photometry request for event {id}")
+#     coords = PhotometryCoords(action='new', 
+#                                 graceid=id, 
+#                                 catalog='catnorth', 
+#                                 verbose=True,
+#                                 path_events_dictionary=path_events_dictionary,
+#                                 path_photometry=path_photometry,
+#                                 observing_run='O4c')
     
-    ra, dec, jd, number_agn = coords.get_photometry_coords()
+#     ra, dec, jd, number_agn = coords.get_photometry_coords()
 
-    time_since_event = Time.now().jd - Time(dateobs).jd
-    if time_since_event > 7: # safeguard: don't automatically request if more than a week has passed
-        print(f"Not automatically requesting photometry for event {id} because it has been more than 7 days")
-        zfps = "missed new request"
-    else:
-        #make sure we are within photometry limit
-        # TODO : could optimize this so we always have the max number of requests in
-        if number_pending_requests + number_agn > 15000:
-            coords.queue_photometry(ra, dec, jd, number_agn)
-            do_photometry = False
-            continue
+#     time_since_event = Time.now().jd - Time(dateobs).jd
+#     if time_since_event > 7: # safeguard: don't automatically request if more than a week has passed
+#         print(f"Not automatically requesting photometry for event {id} because it has been more than 7 days")
+#         zfps = "missed new request"
+#     else:
+#         #make sure we are within photometry limit
+#         # TODO : could optimize this so we always have the max number of requests in at any given time
+#         if number_pending_requests + number_agn > 15000:
+#             coords.queue_photometry(ra, dec, jd, number_agn)
+#             do_photometry = False
+#             continue
             
-        submission = GetPhotometry(ra=ra,
-                    dec=dec,
-                    jd=jd,
-                    graceid=id,
-                    observing_run='O4c',
-                    testing=testing).submit()
+#         submission = GetPhotometry(ra=ra,
+#                     dec=dec,
+#                     jd=jd,
+#                     graceid=id,
+#                     observing_run='O4c',
+#                     testing=testing).submit()
 
-        zfps = {
-                "catalog": "catnorth",
-                "submission_date": submission[0],
-                "action": "new",
-                "num_agn_submitted": submission[1],
-                "num_batches_submitted": submission[2],
-                "batch_ids": None,
-                "number_returned": None,
-                "number_broken_urls": None,
-                "complete": False
-            }
+#         zfps = {
+#                 "catalog": "catnorth",
+#                 "submission_date": submission[0],
+#                 "action": "new",
+#                 "num_agn_submitted": submission[1],
+#                 "num_batches_submitted": submission[2],
+#                 "batch_ids": None,
+#                 "number_returned": None,
+#                 "number_broken_urls": None,
+#                 "complete": False
+#             }
         
-        number_pending_requests += number_agn
+#         number_pending_requests += number_agn
 
-    # save this event to data/photometry_pipeline.json
-    event_data = {
-        "dateobs": date,
-        "over_200_days": False,
-        "zfps": [
-            zfps
-        ]
-    }
-    followup.add_event(id, event_data)
+#     # save this event to data/photometry_pipeline.json
+#     event_data = {
+#         "dateobs": date,
+#         "over_200_days": False,
+#         "zfps": [
+#             zfps
+#         ]
+#     }
+#     followup.add_event(id, event_data)
 
 ###PART 2 : followup photometry and flare identification
 
