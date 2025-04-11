@@ -695,22 +695,17 @@ class PushEventsPublic():
             # Resolve the repository root and events_summary path
             repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'))
             path_events_summary = os.path.abspath(os.path.join(repo_root, 'events_summary'))
-            
             # Set the remote URL for the repository
             subprocess.run(['git', '-C', repo_root, 'remote', 'set-url', 'origin', remote_url], check=True)
-            
             # Stage changes in the events_summary directory
             subprocess.run(['git', '-C', repo_root, 'add', path_events_summary], check=True)
-            
             # Check the status of the repository
             result = subprocess.run(['git', '-C', repo_root, 'status', '--porcelain'], capture_output=True, text=True)
-            
             # Commit changes if there are any
             if not result.stdout.strip():
                 print("No changes to commit.")
             else:
                 subprocess.run(['git', '-C', repo_root, 'commit', '-m', commit_message], check=True)
-                
                 # Check for new commits to push
                 push_check = subprocess.run(['git', '-C', repo_root, 'log', 'origin/main..HEAD'], capture_output=True, text=True)
                 if not push_check.stdout.strip():
