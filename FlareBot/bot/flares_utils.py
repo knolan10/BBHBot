@@ -264,7 +264,7 @@ class RollingWindowHeuristic:
     
 
 class Plotter:
-    def __init__(self, index_to_plot, color_to_plot, agn, rolling_stats, graceid, path_events_dictionary, observing_run='O4c'):
+    def __init__(self, index_to_plot, color_to_plot, agn, rolling_stats, graceid, path_events_dictionary, observing_run='O4c', flares_from_graceid=False):
         self.index_to_plot = index_to_plot
         self.color_to_plot = color_to_plot
         self.agn = agn
@@ -272,16 +272,43 @@ class Plotter:
         self.graceid = graceid
         self.path_events_dictionary = path_events_dictionary
         self.observing_run = observing_run
+        self.flares_from_graceid = flares_from_graceid
         
         # open the stored event info
         with open(f'{path_events_dictionary}/dicts/events_dict_{self.observing_run}.json', 'r') as file:
             events_dict = json.load(file)
         self.dateobs = events_dict[self.graceid]['gw']['GW MJD'] + 2400000.5
+        
+        if self.flares_from_graceid:
+            flare_coords = events_dict[graceid]['flare']
+            coords = []
+            # Collect coordinates based on the bands in flares_from_graceid
+            if 'g' in flares_from_graceid:
+                coords.append(flare_coords.get('coords_g', []))
+            if 'r' in flares_from_graceid:
+                coords.append(flare_coords.get('coords_r', []))
+            if 'i' in flares_from_graceid:
+                coords.append(flare_coords.get('coords_i', []))
+            # Find common values across all coordinate lists
+            if coords:
+                common_values = set(coords[0])  # Start with the first sublist
+                for sublist in coords[1:]:
+                    common_values &= set(sublist)  # Intersect with the next sublist
+            else:
+                common_values = set()  # Handle empty list of lists
+            # Convert the result back to a list
+            selected_flares = list(common_values)
+            print(f'{len(selected_flares)} AGN have flares in {flares_from_graceid} band(s)')
+            #get indices for these flares
+            all_AGN_coords = [agn[3] for agn in self.agn]
+            flare_indices = [i for i, value in enumerate(all_AGN_coords) if value in selected_flares]
+            self.index_to_plot = [flare_indices[self.index_to_plot[0]]]
 
 
     def plot_all(self, index):
         agn_indexed = self.agn[index]
-        rolling_stats_indexed = self.rolling_stats[index]
+        if self.rolling_stats:
+            rolling_stats_indexed = self.rolling_stats[index]
         if type(self.dateobs)==list:
             gw_date_indexed = self.dateobs[index]
         else:
@@ -291,13 +318,13 @@ class Plotter:
         else:
             eventid_indexed = self.graceid
         fig, axes = plt.subplots(1, 3, figsize=(12, 5))
-        fig.suptitle(f'{eventid_indexed}', fontsize=18)
+        fig.suptitle(f'{eventid_indexed} ({agn_indexed[3]})', fontsize=18)
         colors = ['#77926f', '#c8aca9', '#cba560']  # Colors for g, r, i filters
         titles = ['filter=g', 'filter=r', 'filter=i']
         dateobs_mjd = round(Time(gw_date_indexed, format='jd').mjd)
 
         for i, ax in enumerate(axes):  # i represents each filter color
-            ax.set_title(f'{titles[i]}, index = {index}', fontsize=15)
+            ax.set_title(f'{titles[i]}', fontsize=15)
 
             curve = agn_indexed[i].copy()
 
@@ -313,19 +340,19 @@ class Plotter:
             ax.errorbar(weighted_means.index, weighted_means, yerr=mean_sigma_mag, fmt='none', ecolor=colors[i], capsize=0)
 
             # Plot horizontal line through each median in rolling window
-            baseline_medians = rolling_stats_indexed[i][0]
-            baseline_times = [time - 2400000 for time in rolling_stats_indexed[i][4][:len(baseline_medians)]]  # MJD
-            for j in range(len(baseline_medians)):
-                ax.axhline(y=baseline_medians[j], color=colors[i], linestyle='dashed', lw=0.75)
-                ax.plot(baseline_times, baseline_medians, 'o', color=colors[i], markersize=5)
+            if self.rolling_stats:
+                baseline_medians = rolling_stats_indexed[i][0]
+                baseline_times = [time - 2400000 for time in rolling_stats_indexed[i][4][:len(baseline_medians)]]  # MJD
+                for j in range(len(baseline_medians)):
+                    ax.axhline(y=baseline_medians[j], color=colors[i], linestyle='dashed', lw=0.75)
+                    ax.plot(baseline_times, baseline_medians, 'o', color=colors[i], markersize=5)
+                # Plot points for rolling medians in GW
+                gw_medians = rolling_stats_indexed[i][2]
+                gw_times = [time - 2400000 for time in rolling_stats_indexed[i][4][len(baseline_medians):]]  # MJD
+                ax.plot(gw_times, gw_medians, "X", color='#fc2647', markersize=10)
 
             # Plot GW window
             ax.axvspan(dateobs_mjd, dateobs_mjd + 200, color='#c5c9c7', alpha=0.7)
-
-            # Plot points for rolling medians in GW
-            gw_medians = rolling_stats_indexed[i][2]
-            gw_times = [time - 2400000 for time in rolling_stats_indexed[i][4][len(baseline_medians):]]  # MJD
-            ax.plot(gw_times, gw_medians, "X", color='#fc2647', markersize=10)
 
             ax.invert_yaxis()
             ax.set_xlabel('MJD', fontsize=15)
@@ -341,7 +368,8 @@ class Plotter:
 
     def plot_single(self, index):
         agn_indexed = self.agn[index]
-        rolling_stats_indexed = self.rolling_stats[index]
+        if self.rolling_stats:
+            rolling_stats_indexed = self.rolling_stats[index]
         if type(self.gw_date)==list:
             gw_date_indexed = self.dateobs[index]
         else:
@@ -364,7 +392,7 @@ class Plotter:
         color = ['#77926f', '#c8aca9', '#cba560'][i]  # Colors for g, r, i filters
 
         fig, ax = plt.subplots(figsize=(12, 5))
-        fig.suptitle(f'{eventid_indexed}', fontsize=18)
+        fig.suptitle(f'{eventid_indexed} ({agn_indexed[3]})', fontsize=18)
         # Convert JD to MJD for plotting
         curve['mjd'] = curve['jd'].round() - 2400000
         # Group by MJD and plot weighted means for readability
@@ -375,18 +403,20 @@ class Plotter:
         mean_sigma_mag = grouped['sigma_mag'].mean()
         ax.plot(weighted_means.index, weighted_means, 'o', color=color, markersize=3)
         ax.errorbar(weighted_means.index, weighted_means, yerr=mean_sigma_mag, fmt='none', ecolor=color, capsize=0)
-        # Plot horizontal line through each median in rolling window
-        baseline_medians = rolling_stats_indexed[i][0]
-        baseline_times = [time - 2400000 for time in rolling_stats_indexed[i][4][:len(baseline_medians)]]  # MJD
-        for j in range(len(baseline_medians)):
-            ax.axhline(y=baseline_medians[j], color=color, linestyle='dashed', lw=0.75)
-            ax.plot(baseline_times, baseline_medians, 'o', color=color, markersize=5)
+        if self.rolling_stats:
+            # Plot horizontal line through each median in rolling window
+            baseline_medians = rolling_stats_indexed[i][0]
+            baseline_times = [time - 2400000 for time in rolling_stats_indexed[i][4][:len(baseline_medians)]]  # MJD
+            for j in range(len(baseline_medians)):
+                ax.axhline(y=baseline_medians[j], color=color, linestyle='dashed', lw=0.75)
+                ax.plot(baseline_times, baseline_medians, 'o', color=color, markersize=5)
+             # Plot points for rolling medians in GW
+            gw_medians = rolling_stats_indexed[i][2]
+            gw_times = [time - 2400000 for time in rolling_stats_indexed[i][4][len(baseline_medians):]]  # MJD
+            ax.plot(gw_times, gw_medians, "X", color='#fc2647', markersize=10)
         # Plot GW window
         ax.axvspan(dateobs_mjd, dateobs_mjd + 200, color='#c5c9c7', alpha=0.7)
-        # Plot points for rolling medians in GW
-        gw_medians = rolling_stats_indexed[i][2]
-        gw_times = [time - 2400000 for time in rolling_stats_indexed[i][4][len(baseline_medians):]]  # MJD
-        ax.plot(gw_times, gw_medians, "X", color='#fc2647', markersize=10)
+    
         #axes
         ax.invert_yaxis()
         ax.set_xlabel('MJD', fontsize=15)

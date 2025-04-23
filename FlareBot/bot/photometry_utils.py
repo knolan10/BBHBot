@@ -734,7 +734,7 @@ class PhotometryLog():
             if time_delta < 7:
                 continue
             for x in self.photometry_pipeline['events'][id]['zfps']:
-                if type(x)!= str and not x['complete'] :
+                if type(x)!= str and not x['complete']:
                     waiting_for_photometry.append([id, x['submission_date'], x['num_batches_submitted'], x['action']])
             # find events that need update photometry request based on our cadence (loosely based on followup TOO schedule)
             num_zfps_requests_so_far = len([x for x in self.photometry_pipeline['events'][id]['zfps'] if "from_queue" not in x])
