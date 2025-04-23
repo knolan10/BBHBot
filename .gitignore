@@ -9,3 +9,5 @@ FlareBot/bot/FlareBotCredentials.yaml
 
 FlareBot/bot/data/dicts
 FlareBot/bot/data/queued_for_photometry
+
+dev/data/

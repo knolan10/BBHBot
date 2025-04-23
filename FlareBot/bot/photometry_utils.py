@@ -215,7 +215,7 @@ class PhotometryCoords():
             declist = [dec[i:i+1500] for i in range(0, len(dec), 1500)]
             if self.action == 'update':
                 date = [date] * len(ralist)
-            print(f'More than 1500 AGN - submit in {len(ralist)} batches')
+            print(f'Submit in {len(ralist)} batches')
             return ralist, declist, date
         
     def replace_scientific_notation(self, ra_list, dec_list):
@@ -294,12 +294,13 @@ class PhotometryCoords():
             "number_to_submit": number_to_submit,
             "action": self.action
         }
+        print(f"Saving {len(ra)} queued photometry to {file_path}")
         with open(file_path, 'w') as file:
             json.dump(data, file, indent=4)
 
     def retrieve_queue_photometry(path_queued_photometry):
         """
-        Retrieve id, ra, dec, jd for all queued requests
+        Retrieve id, ra, dec, jd, dateobs for all queued requests
         """
         photometry_data = []
         
@@ -332,7 +333,7 @@ class PhotometryCoords():
 
 
 class GetPhotometry():
-    def __init__(self, ra, dec, jd, graceid, observing_run='O4c', path_events_dictionary='data', testing=False):
+    def __init__(self, ra, dec, jd, graceid, observing_run='O4c', path_events_dictionary='data', testing=True):
         self.ra=ra
         self.dec=dec
         self.jd=jd
@@ -397,8 +398,7 @@ class GetPhotometry():
                 print('submit in one batch')  
                 self.submit_post(self.ra, self.dec, self.jd)         
         photometry_date = self.save_photometry_date()
-        if not self.testing:
-            print(f'Submitted {num_agn} AGN in {num_batches} batches at {photometry_date}')
+        print(f'Submitted {num_agn} AGN in {num_batches} batches at {photometry_date}')
         return photometry_date, num_agn, num_batches
 
 
@@ -430,12 +430,11 @@ class SavePhotometry():
             full_table = pd.read_html(html_content)[0]
             pattern = '|'.join(self.batch_codes)
             table_gw = full_table[full_table['lightcurve'].str.contains(pattern, na=False)]
-            print (len(table_gw), 'coords found')
+            print(f'{len(table_gw)} coords found')
             ra = table_gw['ra'].tolist()
             dec = table_gw['dec'].tolist()
             name = [str(r) + '_' + str(d) for r,d in zip(ra,dec)] 
         if len(table_gw) == 0:
-            print('No coords found')
             return None
         return table_gw, name
     
@@ -443,53 +442,73 @@ class SavePhotometry():
         """
         load zfps table, get batch_codes, get coords, format filename given the graceid and submission date and number of batches
         """
-        with gzip.open(f'./bot/data/dicts/crossmatch_dict_{self.obsering_run}.gz', 'rb') as f:
+        with gzip.open(f'data/dicts/crossmatch_dict_{self.observing_run}.gz', 'rb') as f:
             crossmatch_dict = pickle.load(f)
         action = 'Query Database'
         settings = {'email': email, 'userpass': userpass, 'option': 'All recent jobs', 'action': action}
         # load the full table of returned zfps:
         url = 'https://ztfweb.ipac.caltech.edu/cgi-bin/getBatchForcedPhotometryRequests.cgi'
         r = requests.get(url, auth = (auth_username, auth_password), params = settings)
-        if r.status_code == 200:
-            print("Script executed normally and queried the ZTF Batch Forced Photometry database.\n")
-            html_content = StringIO(r.text)
-            full_table = pd.read_html(html_content)[0]
-            
-            #find the coords we submitted from ra/dec
-            crossmatch_df = pd.DataFrame(crossmatch_dict[self.graceid]['agn_catnorth'])
-            filtered_table = pd.merge(full_table, crossmatch_df, on=['ra', 'dec'])
-                                                                                                                                                                                            
-            #find the coords from our submission date
-            submission_date_astropy = Time(self.submission_date)                                                                                                                                                                                           
-            def is_same_day(date_str):
-                date_astropy = Time(date_str)
-                return (date_astropy.datetime.year == submission_date_astropy.datetime.year and
-                        date_astropy.datetime.month == submission_date_astropy.datetime.month and
-                        date_astropy.datetime.day == submission_date_astropy.datetime.day)
-            filtered_table['matches_date'] = filtered_table['created'].apply(is_same_day)
-            filtered_table = filtered_table[filtered_table['matches_date']]
-            filtered_table = filtered_table.drop(columns=['matches_date'])
-            print(f'{len(filtered_table)} coords found')
+        if r.status_code != 200:
+            print(f"Error: {r.status_code} - {r.text}")
+            return None
+        
+        print("Script executed normally and queried the ZTF Batch Forced Photometry database.\n")
+        html_content = StringIO(r.text)
+        full_table = pd.read_html(html_content)[0]
+        
+        #find the coords we submitted from ra/dec
+        crossmatch_df = pd.DataFrame(crossmatch_dict[self.graceid]['agn_catnorth'])
+        # Deal with rounding issues and ensure consistent formatting
+        def truncate_to_precision(value, precision=4):
+            try:
+                return f"{float(value):.{precision}f}"
+            except ValueError:
+                return None
+        full_table['ra_truncated'] = full_table['ra'].apply(lambda x: truncate_to_precision(x))
+        full_table['dec_truncated'] = full_table['dec'].apply(lambda x: truncate_to_precision(x))
+        crossmatch_df['ra_truncated'] = crossmatch_df['ra'].apply(lambda x: truncate_to_precision(x))
+        crossmatch_df['dec_truncated'] = crossmatch_df['dec'].apply(lambda x: truncate_to_precision(x))
+        # Match ra/dec values for the event
+        filtered_table = pd.merge(
+            full_table,
+            crossmatch_df[['ra_truncated', 'dec_truncated']],
+            on=['ra_truncated', 'dec_truncated'],
+            how='inner'  
+        )                                                                                                                                                                        
+                                                                                                                                                                    
+        #find the coords from our submission date (just check close enough bc there are time zone differences)
+        submission_date_astropy = Time(self.submission_date)                                                                                                                                                                                           
+        def is_within_24_hours(date_str):
+            date_astropy = Time(date_str)
+            time_difference = abs((date_astropy - submission_date_astropy).to('hour').value)
+            return time_difference <= 24
+        filtered_table['matches_date'] = filtered_table['created'].apply(is_within_24_hours)
+        filtered_table = filtered_table[filtered_table['matches_date']]
+        filtered_table = filtered_table.drop(columns=['matches_date'])
+        print(f'{len(filtered_table)} coords found')
 
-            # check if we retrieved the same number of batches as submitted, if not, likely not complete yet
-            # TODO: this will break when batch codes are > 5 digits
-            def extract_batch_code(lightcurve):
-                match = re.search(r'/(\d{5})/', lightcurve)
-                if match:
-                    return match.group(0) 
-                return None
-            filtered_table['batch_code'] = filtered_table['lightcurve'].apply(extract_batch_code)
-            num_batches_received = filtered_table['batch_code'].nunique()
-            batches_received = filtered_table['batch_code'].unique()
-            if num_batches_received != self.num_batches_submitted:
-                print(f'Returned {num_batches_received} batches for {self.num_batches_submitted} submitted')
-                return None
+        # check if we retrieved the same number of batches as submitted, if not, likely not complete yet
+        # TODO: this will break when batch codes are > 5 digits
+        def extract_batch_code(lightcurve):
+            match = re.search(r'/(\d{5})/', lightcurve)
+            if match:
+                return match.group(1)  
+            return None 
+        filtered_table['batch_code'] = filtered_table['lightcurve'].apply(extract_batch_code)
+        num_batches_received = filtered_table['batch_code'].nunique()
+        batches_received = filtered_table['batch_code'].unique()
+        print(f'Returned {num_batches_received} batches for {self.num_batches_submitted} submitted')
+        if num_batches_received != self.num_batches_submitted:
+            return None
 
         # need to do this because there is a slight difference between the coords submitted and those returned usually
         ra = filtered_table['ra'].tolist()
         dec = filtered_table['dec'].tolist()
         name = [str(r) + '_' + str(d) for r, d in zip(ra, dec)]
         return filtered_table, name, batches_received
+    
+    
     
     def get_photometry(self):
         """
@@ -512,7 +531,7 @@ class SavePhotometry():
         print("Retrieved", len(batch_lightcurves), "lightcurves")
         return batch_lightcurves
 
-    def df_from_url (url, file):
+    def df_from_url (self, url, file):
         """
         load lightcurves from url
         """
@@ -522,7 +541,7 @@ class SavePhotometry():
             df.columns = df.columns.str.replace(',', '') 
             return df, file
     
-    def quality_cut_filter (df):
+    def quality_cut_filter (self,df):
         """
         cut down lc dfs to required columns, recommended quality filtering 
         """
@@ -562,8 +581,9 @@ class SavePhotometry():
         lightcurves = self.get_photometry() 
         result = [self.df_from_url(url, file) for url, file in zip(lightcurves, filename)]
         errors = [x for x in result if x is None]
+        num_errors = len(errors)
         values = [x for x in result if x is not None]
-        print (len(errors), 'broken urls;', len(values), 'lightcurves returned')
+        print (f'{num_errors} broken urls; {len(values)} lightcurves returned')
         lc_from_url, filename_updated = zip(*values)
         lc_cut = [self.quality_cut_filter(df) for df in lc_from_url]
         # if the photometry is an update to existing photometry, open existing df and append
@@ -587,8 +607,8 @@ class SavePhotometry():
                 print('Error: different number of lightcurves and filenames') 
                 return None
         
-        print('downloaded', num_returned, 'lightcurves')
-        return self.batch_codes, num_returned, errors
+        print(f'downloaded {num_returned} lightcurves')
+        return self.batch_codes, num_returned, num_errors
             
         
 
@@ -625,9 +645,7 @@ class PhotometryLog():
         """
         if keyword == 'new_request':
             self.photometry_pipeline['summary_stats']['total_requests'] += number_requested
-            self.photometry_pipeline['summary_stats']['total_currently_pending'] += number_requested
         elif keyword == 'saved_request':
-            self.photometry_pipeline['summary_stats']['total_currently_pending'] -= number_requested
             self.photometry_pipeline['summary_stats']['total_saved'] += number_saved
         else:
             raise ValueError("Invalid keyword. Use 'new_request' or 'saved_request'.")
@@ -635,13 +653,37 @@ class PhotometryLog():
         with open(self.path_pipeline, 'w') as file:
             json.dump(self.photometry_pipeline, file, indent=4)
 
-    def check_number_pending(self):
+    def save_num_pending(self, num_pending):
         """
-        check how many requests are currently pending
+        keep track of total requests and saved requests
+        use pending value to prevent from having > 20,000 requests at once, which ZFPS wont allow
         """
-        pending = self.photometry_pipeline['summary_stats']['total_currently_pending']
-        print(f'Total number of pending requests: {pending}')
-        return pending
+        self.photometry_pipeline['summary_stats']['total_currently_pending'] = num_pending
+        with open(self.path_pipeline, 'w') as file:
+            json.dump(self.photometry_pipeline, file, indent=4)
+    
+    def check_num_pending_zfps(self):
+        """
+        get number of pending ZFPS requests
+        """
+        action = 'Query Database'
+        settings = {'email': email, 'userpass': userpass, 'option': 'Pending jobs', 'action': action}
+        # load the full table of returned zfps:
+        url = 'https://ztfweb.ipac.caltech.edu/cgi-bin/getBatchForcedPhotometryRequests.cgi'
+        r = requests.get(url, auth = (auth_username, auth_password), params = settings)
+        if r.status_code == 200:
+            print("Script executed normally and queried the ZTF Batch Forced Photometry database.\n")
+            html_content = StringIO(r.text)
+            if "Zero records returned" in r.text:
+                num_pending = 0
+            else:
+                full_table = pd.read_html(html_content)[0]
+                num_pending= full_table.shape[0]
+            print(f"Number of pending requests: {num_pending}")
+            return num_pending
+        else:
+            print(f"Error: {r.status_code}")
+            return None
 
     def add_event(self, event_id, event_data):
         """
@@ -680,26 +722,29 @@ class PhotometryLog():
         """
         Check if we should request or retrieve photometry for any event
         """
-        first_update_request = []
-        pending_request = []
-        update_request = []
+        needs_photometry_request = []
+        waiting_for_photometry = []
         for id in self.photometry_pipeline['events'].keys():
             if self.photometry_pipeline['events'][id]['over_200_days'] or 'dateobs' not in self.photometry_pipeline['events'][id]:
                 continue
-            for x in self.photometry_pipeline['events'][id]['zfps']:
-                if type(x)!= str and not x['complete']:
-                    pending_request.append([id, x['submission_date'], x['num_batches_submitted']])
             dateobs = self.photometry_pipeline['events'][id]['dateobs']
             time_delta = round((Time.now() - Time(dateobs, format='isot')).to_value('jd'))
-            # TODO this will break if we don't run one day, add check to ensure we dont miss any request
-            if time_delta == 9:
-                first_update_request.append(id)
-            if time_delta in [20, 30, 50, 100]:
-                update_request.append(id)
-        print(f'First update request: {[x[0] for x in first_update_request]}')
-        print(f'Pending request: {[x[0] for x in pending_request]}')
-        print(f'Update request: {[x[0] for x in update_request]}')
-        return first_update_request, update_request, pending_request
+            # get pending photometry
+            # first ZFPS request tends to take a couple days, so build in a buffer instead of hitting ZFPS daily
+            if time_delta < 7:
+                continue
+            for x in self.photometry_pipeline['events'][id]['zfps']:
+                if type(x)!= str and not x['complete'] :
+                    waiting_for_photometry.append([id, x['submission_date'], x['num_batches_submitted'], x['action']])
+            # find events that need update photometry request based on our cadence (loosely based on followup TOO schedule)
+            num_zfps_requests_so_far = len([x for x in self.photometry_pipeline['events'][id]['zfps'] if "from_queue" not in x])
+            time_delta_thresholds = [9, 20, 30, 50, 100]
+            num_requests_should_be_made = [2, 3, 4, 5, 6] # ie after 9 days, we should have 2 requests (the initial and a first update)
+            if any(time_delta >= t and num_zfps_requests_so_far < z for t, z in zip(time_delta_thresholds, num_requests_should_be_made)):
+                needs_photometry_request.append([id, dateobs, 'update'])
+        print(f'Waiting for photometry: {[x[0] for x in waiting_for_photometry]}')
+        print(f'Needs photometry request: {[x[0] for x in needs_photometry_request]}')
+        return needs_photometry_request, waiting_for_photometry
     
     def update_photometry_complete(self, event_id, submission_date, batch_ids, num_returned, num_broken):
         """
@@ -709,9 +754,9 @@ class PhotometryLog():
             for x in self.photometry_pipeline['events'][event_id]['zfps']:
                 if x['submission_date'] == submission_date:
                     x['complete'] = True
-                    x['batch_ids'] = batch_ids
-                    x['number_returned'] = num_returned
-                    x['number_broken'] = num_broken
+                    x['batch_ids'] = str(batch_ids)
+                    x['number_returned'] = int(num_returned)
+                    x['number_broken_urls'] = int(num_broken)
                     # update summary
                     num_req = x['num_agn_submitted']
                     self.update_summary_stats(number_requested=num_req,number_saved=num_returned,keyword='saved_request')

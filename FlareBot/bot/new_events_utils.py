@@ -312,7 +312,6 @@ class Fritz():
         if not plans:
             raise ValueError('No plans found')
         observation_plan_requests = plans['data']['observation_plan_requests']
-        print(f'There are currently {plans['data']['totalMatches']} observation plans generated')
         trigger_status = [self.determine_trigger_status(observation_plan_requests, i, j, a, f, m) 
                           for i,j,a,f,m in zip(self.eventid, self.dateid, self.a90, self.far, self.mass)]
         error = [(i, x) for i, x in enumerate(trigger_status) if x[0] == 'error']
@@ -668,7 +667,7 @@ class PushEventsPublic():
         trigger_df['Mass (M_sol)'] = trigger_df['Mass (M_sol)'].str.strip().astype(int)
         # trigger_df['GW ISO'] = Time(trigger_df['GW MJD'], format='mjd').iso
         # trigger_df['GW ISO'] = trigger_df['GW ISO'].str.split('T').str[0]  
-        plt.figure(figsize=(10, 2))
+        plt.figure(figsize=(18, 2))
         plt.scatter(trigger_df['GW MJD'], [0.1] * len(trigger_df), s=trigger_df['Mass (M_sol)']*10, alpha=0.5)
         plt.xlabel('Date (MJD)', fontsize=18)
         plt.yticks([])

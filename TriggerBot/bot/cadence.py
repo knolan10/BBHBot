@@ -19,15 +19,15 @@ else:
 
 
 # look at any pending observations and determine whether we were successful in observing
-retry = parse_pending_observation(credentials, fritz_token, mode, testing)
-print(f'retry: {retry}')
+# retry = parse_pending_observation(credentials, fritz_token, mode, testing)
+# print(f'retry: {retry}')
 
 # check if it is time for any follow-up triggers
 followup = trigger_on_cadence()
 print(f'followup: {followup}')
 
 # handle follow-up triggers both for those in the scheduled cadence and for those that were unsuccessful
-new_triggers = followup + retry
+new_triggers = followup #+ retry
 
 if new_triggers:
     for x in new_triggers:

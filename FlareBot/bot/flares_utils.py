@@ -11,14 +11,15 @@ import math
 from astropy.time import Time
 
 class FlarePreprocessing():
-    def __init__(self, graceid, path_events_dictionary, path_photometry):
+    def __init__(self, graceid, path_events_dictionary, path_photometry, observing_run='O4c'):
         self.graceid = graceid
         self.path_events_dictionary = path_events_dictionary
         self.path_photometry = path_photometry
+        self.observing_run = observing_run
 
     def load_event_lightcurves(self):
         # open the stored event info
-        with gzip.open(f'{self.path_events_dictionary}/dicts/crossmatch_dict_O4b.gz', 'rb') as f:
+        with gzip.open(f'{self.path_events_dictionary}/dicts/crossmatch_dict_{self.observing_run}.gz', 'rb') as f:
             crossmatch_dict = pickle.load(f)
         coords = crossmatch_dict[self.graceid]['agn_catnorth']
         name = [str(x['ra']) + '_' + str(x['dec']) for x in coords]
@@ -84,16 +85,17 @@ class FlarePreprocessing():
 # rolling window stats
 
 class RollingWindowStats():
-    def __init__(self, graceid, agn, path_events_dictionary, window_size_before=50, window_size_after=25, baseline_years=2):
+    def __init__(self, graceid, agn, path_events_dictionary, window_size_before=50, window_size_after=25, baseline_years=2, observing_run='O4c'):
         self.graceid = graceid
         self.agn = agn
         self.path_events_dictionary = path_events_dictionary
         self.window_size_before = window_size_before
         self.window_size_after = window_size_after
         self.baseline_years = baseline_years
+        self.observing_run = observing_run
 
         # open the stored event info
-        with open(f'{path_events_dictionary}/dicts/events_dict_O4b.json', 'r') as file:
+        with open(f'{path_events_dictionary}/dicts/events_dict_{self.observing_run}.json', 'r') as file:
             events_dict = json.load(file)
         self.dateobs = events_dict[self.graceid]['gw']['GW MJD'] + 2400000.5
 
@@ -159,7 +161,7 @@ class RollingWindowStats():
 # heuristic
         
 class RollingWindowHeuristic:
-    def __init__(self, graceid, agn, rolling_stats, path_events_dictionary, percent=1, k_mad=3, save=False):
+    def __init__(self, graceid, agn, rolling_stats, path_events_dictionary, percent=1, k_mad=3, save=False, observing_run='O4c'):
         self.graceid = graceid
         self.agn = agn
         self.rolling_stats = rolling_stats
@@ -167,6 +169,7 @@ class RollingWindowHeuristic:
         self.percent = percent  
         self.k_mad = k_mad
         self.save = save
+        self.observing_run = observing_run
 
     def medians_test(self):
         """
@@ -232,7 +235,7 @@ class RollingWindowHeuristic:
                                             'number_g': len(g), 'number_r': len(r),'number_i': len(i),
                                             'coords_g': flare_coords_g, 'coords_r': flare_coords_r, 'coords_i': flare_coords_i,}}
 
-            with open(f'{self.path_events_dictionary}/dicts/events_dict_O4b.json', 'r') as file:
+            with open(f'{self.path_events_dictionary}/dicts/events_dict_{self.observing_run}.json', 'r') as file:
                 events_dict_add = json.load(file)
 
             # add new values to flare key without replacing existing values
@@ -242,7 +245,7 @@ class RollingWindowHeuristic:
                         events_dict_add[key]['flare'].update(value)
                     else:
                         events_dict_add[key]['flare'] = value
-            with open(f'{self.path_events_dictionary}/dicts/events_dict_O4b.json', 'w') as file:
+            with open(f'{self.path_events_dictionary}/dicts/events_dict_{self.observing_run}.json', 'w') as file:
                 json.dump(events_dict_add, file)
             
             # publish to public repo
@@ -251,7 +254,9 @@ class RollingWindowHeuristic:
                 "flare_coords_r": flare_coords_r,
                 "flare_coords_i": flare_coords_i
             }
-            path = f"./flares/{self.graceid}.json"
+            directory = f"{self.path_events_dictionary}/flares"
+            os.makedirs(directory, exist_ok=True)
+            path = f"{directory}/{self.graceid}.json"
             with open(path, 'w') as json_file:
                 json.dump(data, json_file)
 
@@ -259,16 +264,17 @@ class RollingWindowHeuristic:
     
 
 class Plotter:
-    def __init__(self, index_to_plot, color_to_plot, agn, rolling_stats, graceid, path_events_dictionary):
+    def __init__(self, index_to_plot, color_to_plot, agn, rolling_stats, graceid, path_events_dictionary, observing_run='O4c'):
         self.index_to_plot = index_to_plot
         self.color_to_plot = color_to_plot
         self.agn = agn
         self.rolling_stats = rolling_stats
         self.graceid = graceid
         self.path_events_dictionary = path_events_dictionary
+        self.observing_run = observing_run
         
         # open the stored event info
-        with open(f'{path_events_dictionary}/dicts/events_dict_O4b.json', 'r') as file:
+        with open(f'{path_events_dictionary}/dicts/events_dict_{self.observing_run}.json', 'r') as file:
             events_dict = json.load(file)
         self.dateobs = events_dict[self.graceid]['gw']['GW MJD'] + 2400000.5
 
