@@ -4,7 +4,7 @@ import time
 import pickle
 import threading
 from TriggerBot.bot.trigger_utils import *
-from log import log, heartbeat
+from utils.log import log, heartbeat
 
 with open('../credentials.yaml', 'r') as file:
     credentials = yaml.safe_load(file)
@@ -189,7 +189,7 @@ while True:
                     raise MyException(logmessage)
 
                 # check if ZTF survey naturaly covered the skymap previous nights
-                #NEED TO UPDATE THIS FUNCTION SO IT CHECKS NOT JUST FOR OBSERVATIONS BUT FOR SUFFICIENT % COVERAGE
+                #TODO NEED TO UPDATE THIS FUNCTION SO IT CHECKS NOT JUST FOR OBSERVATIONS BUT FOR SUFFICIENT % COVERAGE
                 startdate = (Time(dateobs) - TimeDelta(2, format='jd')).iso
                 observations = check_executed_observation(startdate, dateobs, gcnevent_id, fritz_token, mode)
                 if observations['data']['totalMatches'] >= 1:
