@@ -32,8 +32,6 @@ userpass = credentials['zfps_userpass']
 auth_username = credentials['zfps_auth']['username']
 auth_password = credentials['zfps_auth']['password']
 
-# TODO: get number pending directly from IPAC
-
 class PhotometryStatus:
     def __init__(self, observing_run='O4c', path_events_dictionary='bot/data'):
         self.observing_run = observing_run

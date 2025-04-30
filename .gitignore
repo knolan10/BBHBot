@@ -1,13 +1,7 @@
-__pycache__/
-TriggerBot/__pycache__/
-TriggerBot/bot/__pycache__/
-FlareBot/__pycache__/
-FlareBot/bot/__pycache__/
+config/Credentials.yaml
 
-TriggerBot/bot/TriggerCredentials.yaml
-FlareBot/bot/FlareBotCredentials.yaml
-
-FlareBot/bot/data/dicts
-FlareBot/bot/data/queued_for_photometry
+data/flare_data/dicts
+data/flare_data/queued_for_photometry
+data/flare_data/completed_queued_photometry
 
 dev/data/

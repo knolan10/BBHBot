@@ -1,13 +1,16 @@
 # this will run once a day to check for tasks
-print("Starting FlareBot")
 
 from new_events_utils import *
 from photometry_utils import *
 from flares_utils import *
 import time
+from utils.log import log
 
 class MyException(Exception):
     pass
+
+print(f"Starting FlareBot on {Time.now()}")
+
 
 # TODO: organize how i handle paths
 # local path variables
@@ -33,6 +36,8 @@ needs_photometry_request, waiting_for_photometry = followup.check_photometry_sta
 number_pending_requests = followup.check_num_pending_zfps()
 if number_pending_requests > 15000: # ZFPS limit
     do_photometry = False
+
+time.sleep(30)
 
 # check for queued photometry requests (if we previously hit the 15000 limit)
 #if not testing and do_photometry:
