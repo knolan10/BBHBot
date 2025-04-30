@@ -3,10 +3,10 @@ import yaml
 import time
 import pickle
 import threading
-from TriggerBot.bot.trigger_utils import *
+from trigger_utils.trigger_utils import *
 from utils.log import log, heartbeat
 
-with open('../credentials.yaml', 'r') as file:
+with open('config/Credentials.yaml', 'r') as file:
     credentials = yaml.safe_load(file)
 testing = credentials['testing']
 
@@ -22,7 +22,7 @@ else:
     fritz_token = credentials['fritz_token']
     allocation = credentials['allocation']
 
-MLP = pickle.load(open('mlp_model.sav', 'rb'))
+MLP = pickle.load(open('utils/mlp_model.sav', 'rb'))
 
 config = {'group.id': 'ztfmasstrigger',
           'auto.offset.reset': 'earliest',

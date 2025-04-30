@@ -1,12 +1,12 @@
-from cadence_utils import *
-from trigger_utils import *
+from trigger_utils.cadence_utils import *
+from trigger_utils.trigger_utils import submit_plan, get_plan_stats, trigger_ztf, send_trigger_email
 import yaml
 import time
-from ...utils.log import log
+from utils.log import log
 
 print(f"Starting FlareBot on {Time.now()}")
 
-with open('TriggerCredentials.yaml', 'r') as file:
+with open('config/Credentials.yaml', 'r') as file:
     credentials = yaml.safe_load(file)
 testing = credentials['testing']
 

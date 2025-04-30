@@ -3,5 +3,6 @@ config/Credentials.yaml
 data/flare_data/dicts
 data/flare_data/queued_for_photometry
 data/flare_data/completed_queued_photometry
+data/flare_data/ZFPS
 
 dev/data/

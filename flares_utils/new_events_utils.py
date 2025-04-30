@@ -2,7 +2,6 @@ import pandas as pd
 from pandas import json_normalize
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy import stats
 from astropy.table import Table
 import astropy.cosmology as cos
 from astropy.cosmology import Planck15 as cosmo
@@ -18,52 +17,21 @@ import pickle
 import gzip
 import base64
 import json
-import glob
-from bs4 import BeautifulSoup
 import os
-import logging
-import io
-from io import StringIO
 from io import BytesIO
-import yaml
 import subprocess
 from ligo.skymap.io import read_sky_map
-import ligo.skymap.plot
 import ligo.skymap.postprocess
 from ligo.gracedb.rest import GraceDb
 g = GraceDb()  
 from penquins import Kowalski
 
-
-# credentials
-paths = ['FlareBotCredentials.yaml', 'bot/FlareBotCredentials.yaml']
-credentials = None
-for path in paths:
-    try:
-        with open(path, 'r') as file:
-            credentials = yaml.safe_load(file)
-            break  
-    except FileNotFoundError:
-        continue
-if credentials is None:
-    raise Exception("Credentials file not found in any of the specified paths. Check file paths.")
-print("Credentials file loaded successfully.")
-email = credentials['zfps_email']
-userpass = credentials['zfps_userpass']
-auth_username = credentials['zfps_auth']['username']
-auth_password = credentials['zfps_auth']['password'] 
-allocation= credentials['allocation']
-fritz_token = credentials['fritz_token']
-kowalski_password = credentials['kowalski_password']
-github_token= credentials['github_token']
-
-
 class GetSuperevents():
-    def __init__(self, path_events_dictionary, mlp_modelpath, event_source, runid='O4c', kafka_response=None, retrieve_all=False):
-        self.path_events_dictionary = path_events_dictionary
+    def __init__(self, path_data, event_source, mlp_modelpath='utils/mlp_model.sav', observing_run='O4c', kafka_response=None, retrieve_all=False):
+        self.path_data = path_data
         self.mlp_modelpath = mlp_modelpath
         self.event_source = event_source
-        self.runid = runid
+        self.observing_run = observing_run
         self.kafka_response = kafka_response
         self.retrieve_all = retrieve_all
 
@@ -174,13 +142,13 @@ class GetSuperevents():
 
     def get_new_events(self):
         if self.event_source == 'gracedb':
-            event_iterator = g.superevents(f'runid: {self.runid} SIGNIF_LOCKED')
+            event_iterator = g.superevents(f'runid: {self.observing_run} SIGNIF_LOCKED')
             graceids = [superevent['superevent_id'] for superevent in event_iterator]
-            print(f'{len(graceids)} significant superevents in {self.runid}')
+            print(f'{len(graceids)} significant superevents in {self.observing_run}')
             responses = [g.superevent(id) for id in graceids]
             data = [r.json() for r in responses]
             if not self.retrieve_all:
-                with open(f'{self.path_events_dictionary}/dicts/events_dict_{self.runid}.json', 'r') as file:
+                with open(f'{self.path_data}/flare_data/dicts/events_dict_{self.observing_run}.json', 'r') as file:
                     events_dict_add = json.load(file)
                 new_events = [(i, j) for i, j in zip(graceids, data) if i not in list(events_dict_add.keys())]
                 graceids = [x[0] for x in new_events]
@@ -205,12 +173,14 @@ class GetSuperevents():
 
 
 class Fritz():
-    def __init__(self, eventid, dateid, a90, far, mass):
+    def __init__(self, eventid, dateid, a90, far, mass, allocation, fritz_token):
         self.eventid = eventid
         self.dateid = dateid
         self.a90 = a90
         self.far = far
         self.mass = mass    
+        self.allocation = allocation
+        self.fritz_token = fritz_token
 
     def query_fritz_observation_plans(self, allocation, token):
         headers = {'Authorization': f'token {token}'}
@@ -308,7 +278,7 @@ class Fritz():
                     return ['correct','not triggered', total_time, probability, start]
         
     def get_trigger_status(self):    
-        plans = self.query_fritz_observation_plans(allocation, fritz_token)
+        plans = self.query_fritz_observation_plans(self.allocation, self.fritz_token)
         if not plans:
             raise ValueError('No plans found')
         observation_plan_requests = plans['data']['observation_plan_requests']
@@ -335,11 +305,11 @@ class Fritz():
     
 
 class NewEventsToDict():
-    def __init__(self, params, trigger_status, path_events_dictionary, runid='O4c', check_before_run=False):
+    def __init__(self, params, trigger_status, path_data, observing_run='O4c', check_before_run=False):
         self.params = params
         self.trigger_status = trigger_status
-        self.path_events_dictionary = path_events_dictionary
-        self.runid = runid
+        self.path_data = path_data
+        self.observing_run = observing_run
         self.check_before_run = check_before_run
 
     def generate_cadence_dates(self,input_dates):
@@ -391,7 +361,7 @@ class NewEventsToDict():
         df_for_dict = new_events_df.drop(columns=['plan time', 'plan probability', 'plan start', 'cadence'])
         new_events_dict = df_for_dict.to_dict(orient='index')
 
-        with open(f'{self.path_events_dictionary}/dicts/events_dict_{self.runid}.json', 'r') as file:
+        with open(f'{self.path_data}/flare_data/dicts/events_dict_{self.observing_run}.json', 'r') as file:
             events_dict_add = json.load(file)
 
         # add any new events to saved dict
@@ -422,27 +392,27 @@ class NewEventsToDict():
         if self.check_before_run:
             save = input("Save dictionary with new events added? (yes/no): ").strip().lower()
             if save == 'yes':
-                with open(f'{self.path_events_dictionary}/dicts/events_dict_{self.runid}.json', 'w') as file:
+                with open(f'{self.path_data}/flare_data/dicts/events_dict_{self.observing_run}.json', 'w') as file:
                     json.dump(events_dict_add, file)
                 print("New events saved to dictionary.")
             else:
                 print("New events not saved.") 
         else: # save automatically
-            with open(f'{self.path_events_dictionary}/dicts/events_dict_{self.runid}.json', 'w') as file:
+            with open(f'{self.path_data}/flare_data/dicts/events_dict_{self.observing_run}.json', 'w') as file:
                 json.dump(events_dict_add, file)
             print("New events saved to dictionary.")
         return new_events_df
 
 
 class KowalskiCrossmatch():
-    def __init__(self, localization_name, skymap_str, dateobs, zmin, zmax, path_events_dictionary, runid='O4c', catalogs=['catnorth'], mindec=-90, contour=90, testing=False): 
+    def __init__(self, localization_name, skymap_str, dateobs, zmin, zmax, path_data, observing_run='O4c', catalogs=['catnorth'], mindec=-90, contour=90, testing=False, kowalski_password=None): 
         self.localization_name = localization_name
         self.skymap_str = skymap_str
         self.dateobs = dateobs
         self.zmin = zmin
         self.zmax = zmax
-        self.path_events_dictionary = path_events_dictionary
-        self.runid = runid
+        self.path_data = path_data
+        self.observing_run = observing_run
         self.catalogs = catalogs
         self.mindec = mindec
         self.contour = contour
@@ -475,7 +445,7 @@ class KowalskiCrossmatch():
         return kowalski
 
     def check_events_to_crossmatch(self):
-        with open(f'{self.path_events_dictionary}/dicts/events_dict_{self.runid}.json', 'r') as file:
+        with open(f'{self.path_data}/flare_data/dicts/events_dict_{self.observing_run}.json', 'r') as file:
             events_dict_add = json.load(file)
         do_crossmatch = [key for key, value in events_dict_add.items() if not value['crossmatch']]
         print(f'{len(do_crossmatch)} events are missing crossmatch: {do_crossmatch}')
@@ -616,7 +586,7 @@ class KowalskiCrossmatch():
                 print('No catnorth crossmatch')
             else:
                 # open saved crossmatch dict
-                crossmatch_path=f'{self.path_events_dictionary}/dicts/crossmatch_dict_{self.runid}.gz'
+                crossmatch_path=f'{self.path_data}/flare_data/dicts/crossmatch_dict_{self.observing_run}.gz'
                 if os.path.exists(crossmatch_path):
                     with gzip.open(crossmatch_path, 'rb') as f:
                         crossmatch_dict_add = pickle.load(f)
@@ -637,28 +607,28 @@ class KowalskiCrossmatch():
                 catnorth_count = [len(c) if c else None for c in catnorth]
                 quaia_count = [len(q) if q else None for q in quaia]
                 crossmatch_dict_stats = {id: {'n_agn_catnorth': c, 'n_agn_quaia': q} for id, c, q in zip(ids_to_crossmatch, catnorth_count, quaia_count)}
-                with open(f'{self.path_events_dictionary}/dicts/events_dict_{self.runid}.json', 'r') as file:
+                with open(f'{self.path_data}/flare_data/dicts/events_dict_{self.observing_run}.json', 'r') as file:
                     events_dict_add = json.load(file)
                 for key, value in crossmatch_dict_stats.items():
                     if key in events_dict_add:
                         events_dict_add[key]['crossmatch'] = value
                     else:
                         print(f'{key} not in dictionary')
-                with open(f'{self.path_events_dictionary}/dicts/events_dict_{self.runid}.json', 'w') as file:
+                with open(f'{self.path_data}/flare_data/dicts/events_dict_{self.observing_run}.json', 'w') as file:
                     json.dump(events_dict_add, file)
 
             return catnorth, quaia
 
 class PushEventsPublic():
-    def __init__(self, path_events_dictionary, path_events_summary, runid='O4c', testing=False, verbose=True): 
-        self.path_events_dictionary = path_events_dictionary
-        self.path_events_summary = path_events_summary  
-        self.runid = runid
+    def __init__(self, path_data, github_token, observing_run='O4c', testing=False, verbose=True): 
+        self.path_data = path_data
+        self.github_token = github_token
+        self.observing_run = observing_run
         self.testing = testing
         self.verbose = verbose
 
     def plot_trigger_timeline(self):
-        trigger_df = pd.read_csv(f'{self.path_events_summary}/trigger.md', delimiter='|', skipinitialspace=True).iloc[:, 1:-1]
+        trigger_df = pd.read_csv(f'{self.path_data}/events_summary/trigger.md', delimiter='|', skipinitialspace=True).iloc[:, 1:-1]
         trigger_df = trigger_df.iloc[1:]
         trigger_df.columns = ['graceids', 'GW MJD', '90% Area (deg2)', '50% Area (deg2)',
                 'Distance (Gpc)', 'FAR (years/FA)', 'Mass (M_sol)', 'gcnids', 'time',
@@ -683,18 +653,16 @@ class PushEventsPublic():
         plt.ylim(0, 0.2)
         plt.show()
 
-    def push_changes_to_repo(self, github_token):
+    def push_changes_to_repo(self):
         """
         Push changes in the events_summary directory to the remote GitHub repository.
-        Args:
-            github_token (str): The GitHub token for authentication.
         """
         commit_message = 'automated push of new events'
         try:
-            if not github_token:
+            if not self.github_token:
                 raise ValueError("GitHub token is missing. Please provide a valid token.")
             
-            remote_url = f'https://{github_token}@github.com/knolan10/BBHBot.git'
+            remote_url = f'https://{self.github_token}@github.com/knolan10/BBHBot.git'
             # Resolve the repository root and events_summary path
             repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'))
             path_events_summary = os.path.abspath(os.path.join(repo_root, 'events_summary'))
@@ -739,11 +707,11 @@ class PushEventsPublic():
         events_dict_add = {}
         # TODO: make a "maintenance" doc and note that new runids should be added as they start
         for rid in ['O4c', 'O4b']: # runids for BBHBOT trigger operation
-            file_path = f'{self.path_events_dictionary}/dicts/events_dict_{rid}.json'
+            file_path = f'{self.path_data}/flare_data/dicts/events_dict_{rid}.json'
             with open(file_path, 'r') as file:
                 events_dict_add.update(json.load(file))  # Combine dictionaries
         # get just events for the specified run
-        file_path = f'{self.path_events_dictionary}/dicts/events_dict_{self.runid}.json'
+        file_path = f'{self.path_data}/flare_data/dicts/events_dict_{self.observing_run}.json'
         with open(file_path, 'r') as file:
             current_run_dict = json.load(file)
         current_run_ids = list(set(current_run_dict.keys()))
@@ -787,7 +755,7 @@ class PushEventsPublic():
         highmass_lowarea = pd.merge(high_mass, low_area)  
         priority = pd.merge(highmass_lowarea, confident)
         if self.verbose:
-            print(f'{len(priority)} {self.runid} events with FAR > 10 and mass > 60 and area < 1000 sq deg')
+            print(f'{len(priority)} {self.observing_run} events with FAR > 10 and mass > 60 and area < 1000 sq deg')
         # #manual edits
         priority.loc[priority['GW MJD'] == 60572, 'gcnids'] = '[2024-09-19T06:15:59](https://fritz.science/gcn_events/2024-09-19T06:15:59)'
         # #add comments
@@ -844,30 +812,30 @@ class PushEventsPublic():
         markdown_table_trigger = trigger_df.to_markdown(index=False)
         markdown_table_error_triggers = error_triggers.to_markdown(index=False)
         if not self.testing:
-            os.makedirs(self.path_events_summary, exist_ok=True) 
+            os.makedirs(f'{self.path_data}/events_summary', exist_ok=True) 
             files_to_write = {
-                f'{self.path_events_summary}/{self.runid}.md': markdown_table,
-                f'{self.path_events_summary}/{self.runid}_priority.md': markdown_table_priority,
-                f'{self.path_events_summary}/trigger.md': markdown_table_trigger,
-                f'{self.path_events_summary}/error_trigger.md': markdown_table_error_triggers,
+                f'{self.path_data}/events_summary/{self.observing_run}.md': markdown_table,
+                f'{self.path_data}/events_summary/{self.observing_run}_priority.md': markdown_table_priority,
+                f'{self.path_data}/events_summary/trigger.md': markdown_table_trigger,
+                f'{self.path_data}/events_summary/error_trigger.md': markdown_table_error_triggers,
             }
             for file_path, content in files_to_write.items():
                 with open(file_path, 'w') as f:
                     f.write(content)
-            self.push_changes_to_repo(github_token)
+            self.push_changes_to_repo(self.github_token)
 
         return df, priority, trigger_df, error_triggers
 
 
 class PlotSkymap():
-    def __init__(self, gracedbid, path_events_dictionary='bot/data', runid='O4c', catalog='agn_catnorth'): 
+    def __init__(self, gracedbid, path_data, observing_run='O4c', catalog='agn_catnorth'): 
         self.gracedbid = gracedbid
-        self.path_events_dictionary = path_events_dictionary
-        self.runid = runid
+        self.path_data = path_data
+        self.observing_run = observing_run
         self.catalog = catalog
  
     def load_agn_crossmatches(self):    
-        with gzip.open(f'{self.path_events_dictionary}/dicts/crossmatch_dict_{self.runid}.gz', 'rb') as f:
+        with gzip.open(f'{self.path_data}/flare_data/dicts/crossmatch_dict_{self.observing_run}.gz', 'rb') as f:
             crossmatch_dict = pickle.load(f)
             agn = crossmatch_dict[self.gracedbid][self.catalog]
             ra = [x['ra'] for x in agn]
@@ -926,23 +894,23 @@ class PlotSkymap():
         plt.show()
 
 class VisualizePop():
-    def __init__(self, path_events_dictionary='bot/data', runid='O4c'): 
-        self.path_events_dictionary = path_events_dictionary
-        self.runid = runid
+    def __init__(self, path_data, observing_run='O4c'): 
+        self.path_data = path_data
+        self.observing_run = observing_run
 
     def plot_masses(self):
         # Ensure runid is a list for consistent processing
-        if not isinstance(self.runid, list):
-            self.runid = [self.runid]
+        if not isinstance(self.observing_run, list):
+            self.observing_run = [self.observing_run]
         colors = ['#040348', '#FF5733', '#33FF57']  
         color_cycle = iter(colors) 
         plt.figure(figsize=(10, 6))  
         bin_edges = None
         stacked_heights = None
-        for run in self.runid:
+        for run in self.observing_run:
             try:
                 # Load the events dictionary for the current runid
-                with open(f'{self.path_events_dictionary}/dicts/events_dict_{run}.json', 'r') as file:
+                with open(f'{self.path_data}/flare_data/dicts/events_dict_{run}.json', 'r') as file:
                     events_dict_add = json.load(file)
                 # Extract masses
                 masses = [event['gw']['Mass (M_sol)'] for event in events_dict_add.values() 

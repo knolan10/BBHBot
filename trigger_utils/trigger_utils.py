@@ -409,3 +409,4 @@ def send_trigger_email(credentials, subject_message, dateobs):
     fritz_url = f'https://fritz.science/gcn_events/{dateobs}'
     body = f'<html><body><p>{fritz_url}</p></body></html>'
     send_email(sender_email, sender_password, recipient_emails, subject, body)
+

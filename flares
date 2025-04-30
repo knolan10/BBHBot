@@ -1,34 +1,33 @@
-# this will run once a day to check for tasks
-
-from new_events_utils import *
-from photometry_utils import *
-from flares_utils import *
-import time
+from flares_utils.new_events_utils import *
+from flares_utils.photometry_utils import *
+from flares_utils.flares_utils import *
 from utils.log import log
-
+import time
+import yaml
 class MyException(Exception):
     pass
 
-print(f"Starting FlareBot on {Time.now()}")
+print(f"Starting FlareBot at {Time.now()}")
 
-
-# TODO: organize how i handle paths
-# local path variables
-path_events_dictionary = 'data'
-path_events_summary = '../../events_summary' 
-path_queued_photometry = 'data/queued_for_photometry/'
-path_complete_queued_photometry = 'data/completed_queued_photometry/'
-path_photometry = '../../../../data/bbh/ZFPS/'
-mlp_modelpath = 'mlp_model.sav' 
-path_photometry_pipeline = 'data/photometry_pipeline.json'
-# mode (testing means don't push results, dont request forced photometry)
-testing = False
-do_photometry = True # this flag will be changed to false if we hit the 15000 request limit
-
+#settings / credentials
+with open('config/Credentials.yaml', 'r') as file:
+    credentials = yaml.safe_load(file)
+testing = credentials['testing']
+path_to_data = credentials['path_to_data']
+observing_run = credentials['observing_run']
+email = credentials['zfps_email']
+userpass = credentials['zfps_userpass']
+auth_username = credentials['zfps_auth']['username']
+auth_password = credentials['zfps_auth']['password'] 
+allocation= credentials['allocation']
+fritz_token = credentials['fritz_token']
+kowalski_password = credentials['kowalski_password']
+github_token= credentials['github_token']
 
 # Part 0 : load current photometry status
 print("------------------PART 0: Check status, try to submit queued requests------------------")
-followup = PhotometryLog(path_photometry_pipeline)
+do_photometry = True # this flag will be changed to false if we hit the 15000 request limit
+followup = PhotometryLog(path_to_data)
 followup.check_completed_events() #if events are out of 200 day window, edit log so we stop checking them
 # action items :
 needs_photometry_request, waiting_for_photometry = followup.check_photometry_status()
@@ -42,7 +41,7 @@ time.sleep(30)
 # check for queued photometry requests (if we previously hit the 15000 limit)
 #if not testing and do_photometry:
 if do_photometry:
-    queued_photometry = PhotometryCoords.retrieve_queue_photometry(path_queued_photometry)
+    queued_photometry = PhotometryCoords.retrieve_queue_photometry(path_to_data)
     if len(queued_photometry) > 0:
         print(f"Found {len(queued_photometry)} queued photometry requests")
         for x in queued_photometry:
@@ -62,7 +61,7 @@ if do_photometry:
                     dec=dec,
                     jd=jd,
                     graceid=id,
-                    observing_run='O4c',
+                    observing_run=observing_run,
                     testing=testing).submit()
             if submission:
                 new_zfps_entry = {
@@ -83,7 +82,7 @@ if do_photometry:
                 if number_pending_requests > 15000:
                     do_photometry = False
                 # move the file of queued photometry into another "completed queued" directory - could periodically delete these
-                PhotometryCoords.move_complete_queued_photometry(file_name, path_queued_photometry, path_complete_queued_photometry)
+                PhotometryCoords.move_complete_queued_photometry(file_name, path_to_data)
             else:
                 print("Error submitting queued photometry")
 
@@ -93,10 +92,9 @@ time.sleep(30)
 print("-------------------------------PART 1: Photometry Requests-------------------------------")
 
 #check gracedb for new events
-params = GetSuperevents(path_events_dictionary=path_events_dictionary, 
-                        mlp_modelpath=mlp_modelpath,
+params = GetSuperevents(path_data=path_to_data, 
                         event_source='gracedb',
-                        runid='O4c').get_new_events()
+                        observing_run=observing_run).get_new_events()
 
 #check the trigger status of new events on Fritz
 eventid = [x[0] for x in params]
@@ -105,12 +103,12 @@ dateid = [x[12] for x in params]
 a90 = [x[16] for x in params]
 far = [x[9] for x in params]
 mass = [x[22] for x in params]
-trigger_status = Fritz(eventid, dateid, a90, far, mass).get_trigger_status()
+trigger_status = Fritz(eventid, dateid, a90, far, mass, allocation, fritz_token).get_trigger_status()
 
 #save the new events to dictionary
 df = NewEventsToDict(params, 
                     trigger_status, 
-                    path_events_dictionary).save_data()
+                    path_to_data).save_data()
 
 #get catnorth crossmatches
 skymap_str = [x[18] for x in params]
@@ -121,14 +119,15 @@ crossmatch = KowalskiCrossmatch(eventid,
                                 dateid, 
                                 zmin, 
                                 zmax, 
-                                path_events_dictionary,
-                                testing=testing)
+                                path_to_data,
+                                testing=testing,
+                                kowalski_password=kowalski_password)
 matches = crossmatch.get_crossmatches()
 
 #compile all this info in events_summary directory
-df, priority, trigger_df, error_triggers = PushEventsPublic(path_events_dictionary,
-                                                            path_events_summary,
-                                                            runid='O4c',
+df, priority, trigger_df, error_triggers = PushEventsPublic(path_to_data,
+                                                            github_token,
+                                                            observing_run=observing_run,
                                                             testing=testing, 
                                                             verbose=True).format_and_push()
 
@@ -168,9 +167,8 @@ for x in needs_photometry_request:
                                 graceid=id, 
                                 catalog='catnorth', 
                                 verbose=True,
-                                path_events_dictionary=path_events_dictionary,
-                                path_photometry=path_photometry,
-                                observing_run='O4c')
+                                path_data=path_to_data,
+                                observing_run=observing_run)
     
     ra, dec, jd, number_agn = coords.get_photometry_coords()
 
@@ -188,11 +186,15 @@ for x in needs_photometry_request:
         do_photometry = False
         continue
         
-    submission = GetPhotometry(ra=ra,
-                dec=dec,
-                jd=jd,
-                graceid=id,
-                observing_run='O4c',
+    submission = GetPhotometry(ra,
+                dec,
+                jd,
+                id,
+                auth_username, 
+                auth_password,
+                email, 
+                userpass,
+                observing_run=observing_run,
                 testing=testing).submit()
 
     new_zfps_entry = {
@@ -209,7 +211,7 @@ for x in needs_photometry_request:
     
     number_pending_requests += number_agn
 
-    # save this event to data/photometry_pipeline.json
+    # save this event 
     event_data = {
         "dateobs": date,
         "over_200_days": False,
@@ -234,7 +236,7 @@ for x in waiting_for_photometry:
     print(f"Now checking {num_batches} batches {action} request for event {id} on {date_submitted}")
     save_photometry = SavePhotometry(graceid=id, 
                                      action=action, 
-                                     path_photometry=path_photometry, 
+                                     path_data=path_to_data, 
                                      submission_date=date_submitted, 
                                      num_batches_submitted=num_batches)
     saved = save_photometry.save()
@@ -253,15 +255,15 @@ check_for_flares = list(set(check_for_flares))
 for id in check_for_flares:
     # check for flares (will overwrite previouse flare checks each time)
     AGN = FlarePreprocessing(graceid=id, 
-                            path_events_dictionary=path_events_dictionary, 
-                            path_photometry=path_photometry).process_for_flare()
+                            path_data=path_to_data, 
+                            observing_run=observing_run).process_for_flare()
     rolling_stats = RollingWindowStats(graceid=id, 
                             agn=AGN, 
-                            path_events_dictionary=path_events_dictionary).get_rolling_window_stats()
+                            path_data=path_to_data).get_rolling_window_stats()
     g, r, i, gr, gri = RollingWindowHeuristic(graceid=id, 
                                         agn=AGN, 
                                         rolling_stats=rolling_stats, 
-                                        path_events_dictionary=path_events_dictionary,
+                                        path_data=path_to_data,
                                         percent=0.6, 
                                         k_mad=3, 
                                         save=True).get_flares()

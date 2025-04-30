@@ -1,4 +1,3 @@
-import yaml
 import pickle
 import gzip
 import json
@@ -14,32 +13,15 @@ import seaborn as sns
 import matplotlib.pyplot as plt 
 import math
 
-# credentials
-paths = ['FlareBotCredentials.yaml', 'bot/FlareBotCredentials.yaml']
-credentials = None
-for path in paths:
-    try:
-        with open(path, 'r') as file:
-            credentials = yaml.safe_load(file)
-            break  
-    except FileNotFoundError:
-        continue
-if credentials is None:
-    raise Exception("Credentials file not found in any of the specified paths. Check file paths.")
-print("Credentials file loaded successfully.")
-email = credentials['zfps_email']
-userpass = credentials['zfps_userpass']
-auth_username = credentials['zfps_auth']['username']
-auth_password = credentials['zfps_auth']['password']
 
 class PhotometryStatus:
-    def __init__(self, observing_run='O4c', path_events_dictionary='bot/data'):
+    def __init__(self, observing_run='O4c', path_data=None):
         self.observing_run = observing_run
-        self.path_events_dictionary = path_events_dictionary    
+        self.path_data = path_data   
 
     def show_status(self):
         try:
-            with open(f'{self.path_events_dictionary}/dicts/events_dict_{self.observing_run}.json', 'r') as file:
+            with open(f'{self.path_data}/flare_utils/dicts/events_dict_{self.observing_run}.json', 'r') as file:
                 events_dict = json.load(file)
         except:
             print('observing_run must be O4a, O4b, or O4c')
@@ -83,15 +65,14 @@ class PhotometryStatus:
         return zfps_status_df
 
 class PhotometryCoords():
-    def __init__(self, action, graceid, catalog, verbose, path_events_dictionary, path_photometry, observing_run, path_queued_photometry='data/queued_for_photometry'):
+    def __init__(self, action, graceid, catalog, verbose, path_data, observing_run):
         self.action = action
         self.graceid = graceid
         self.catalog = catalog
         self.verbose = verbose
-        self.path_events_dictionary = path_events_dictionary
-        self.path_photometry = path_photometry
+        self.path_data = path_data
         self.observing_run = observing_run
-        self.path_queued_photometry = path_queued_photometry
+        self.path_photometry = f'{self.path_data}/flare_data/ZFPS/'  
 
     def get_agn_coords(self):
         """"
@@ -101,9 +82,9 @@ class PhotometryCoords():
         input: graceid (string), catalog (list of string names of catalogs), action ('all', 'new', 'update') 
         """
         # open the stored event info
-        with gzip.open(f'{self.path_events_dictionary}/dicts/crossmatch_dict_{self.observing_run}.gz', 'rb') as f:
+        with gzip.open(f'{self.path_data}/flare_data/dicts/crossmatch_dict_{self.observing_run}.gz', 'rb') as f:
             crossmatch_dict = pickle.load(f)
-        with open(f'{self.path_events_dictionary}/dicts/events_dict_{self.observing_run}.json', 'r') as file:
+        with open(f'{self.path_data}/flare_data/dicts/events_dict_{self.observing_run}.json', 'r') as file:
             events_dict = json.load(file)
         coords_catnorth = []
         coords_quaia = []
@@ -198,14 +179,14 @@ class PhotometryCoords():
         """
         get formatting and batching for ZFPS submission
         """
-        with open(f'{self.path_events_dictionary}/dicts/events_dict_{self.observing_run}.json', 'r') as file:
+        with open(f'{self.path_data}/flare_data/dicts/events_dict_{self.observing_run}.json', 'r') as file:
             events_dict = json.load(file)
         ra = [val['ra'] for val in coords]
         dec = [val['dec'] for val in coords]
         if len(coords) == 0:   
             print('no AGN to submit')
             events_dict[self.graceid]['flare'] = {'date_last_zfps': 'no AGN observable by ZTF'}
-            with open(f'{self.path_events_dictionary}/dicts/events_dict_{self.observing_run}.json', 'w') as file:
+            with open(f'{self.path_data}/flare_data/dicts/events_dict_{self.observing_run}.json', 'w') as file:
                 json.dump(events_dict, file) 
             return
         else:
@@ -281,10 +262,10 @@ class PhotometryCoords():
         """
         If we are at request limit, save for later submission
         """
-        file_path = os.path.join(self.path_queued_photometry, f"{self.graceid}.json")
+        file_path = f'{self.path_data}/flare_data/queued_for_photometry/{self.graceid}.json'
         if os.path.exists(file_path):
             timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-            file_path = os.path.join(self.path_queued_photometry, f"{self.graceid}_{timestamp}.json")
+            f'{self.path_data}/flare_data/queued_for_photometry/{self.graceid}_{timestamp}.json'
         data = {
             "ra": ra,
             "dec": dec,
@@ -296,12 +277,13 @@ class PhotometryCoords():
         with open(file_path, 'w') as file:
             json.dump(data, file, indent=4)
 
-    def retrieve_queue_photometry(path_queued_photometry):
+    def retrieve_queue_photometry(path_data):
         """
         Retrieve id, ra, dec, jd, dateobs for all queued requests
         """
         photometry_data = []
         
+        path_queued_photometry = f'{path_data}/flare_data/queued_for_photometry'
         for file_name in os.listdir(path_queued_photometry):
             if file_name.endswith('.json'):
                 file_path = os.path.join(path_queued_photometry, file_name)
@@ -317,10 +299,12 @@ class PhotometryCoords():
                     photometry_data.append((id, ra, dec, jd, number_to_submit, action, file_name))
         return photometry_data
     
-    def move_complete_queued_photometry(file_name, path_queued_photometry, path_complete_queued_photometry):
+    def move_complete_queued_photometry(file_name, path_data):
         """
         Move the file to a different directory
         """
+        path_queued_photometry = f'{path_data}/flare_data/queued_for_photometry'
+        path_complete_queued_photometry = f'{path_data}/flare_data/completed_queued_photometry'
         source_path = os.path.join(path_queued_photometry, file_name)
         destination_path = os.path.join(path_complete_queued_photometry, file_name)
         if os.path.exists(source_path):
@@ -331,13 +315,17 @@ class PhotometryCoords():
 
 
 class GetPhotometry():
-    def __init__(self, ra, dec, jd, graceid, observing_run='O4c', path_events_dictionary='data', testing=True):
+    def __init__(self, ra, dec, jd, graceid, auth_username, auth_password, email, userpass, observing_run='O4c', path_data=None, testing=True):
         self.ra=ra
         self.dec=dec
         self.jd=jd
         self.graceid = graceid
+        self.auth_username = auth_username
+        self.auth_password = auth_password
+        self.email = email
+        self.userpass = userpass
         self.observing_run = observing_run
-        self.path_events_dictionary = path_events_dictionary
+        self.path_data = path_data
         self.testing = testing
 
     def submit_post(self, ra, dec, jd):
@@ -345,10 +333,10 @@ class GetPhotometry():
         dec = json.dumps(dec)
         jdstart = json.dumps(jd)   
         jdend = json.dumps(Time.now().jd)
-        payload = {'ra': ra, 'dec': dec, 'jdstart': jdstart, 'jdend': jdend, 'email': email, 'userpass': userpass}
+        payload = {'ra': ra, 'dec': dec, 'jdstart': jdstart, 'jdend': jdend, 'email': self.email, 'userpass': self.userpass}
         # fixed IP address/URL where requests are submitted:
         url = 'https://ztfweb.ipac.caltech.edu/cgi-bin/batchfp.py/submit'
-        r = requests.post(url, auth = (auth_username, auth_password), data = payload)
+        r = requests.post(url, auth = (self.auth_username, self.auth_password), data = payload)
         if r.status_code == 200:
             print("Success")
         else:
@@ -356,7 +344,7 @@ class GetPhotometry():
 
     def save_photometry_date(self):
         photometry_date = None
-        with open(f'{self.path_events_dictionary}/dicts/events_dict_{self.observing_run}.json', 'r') as file:
+        with open(f'{self.path_data}/flare_data/dicts/events_dict_{self.observing_run}.json', 'r') as file:
             events_dict = json.load(file)
         if len(self.ra) == 0:
             zfps_date_dict = {self.graceid: 'NA'}  
@@ -369,7 +357,7 @@ class GetPhotometry():
                     events_dict[key]['flare'] = {}  
                 events_dict[key]['flare']['date_last_zfps'] = value
                 if not self.testing:  
-                    with open(f'{self.path_events_dictionary}/dicts/events_dict_{self.observing_run}.json', 'w') as file:
+                    with open(f'{self.path_data}/flare_data/dicts/events_dict_{self.observing_run}.json', 'w') as file:
                         json.dump(events_dict, file)
             else:
                 print(f'{key} not in dictionary')
@@ -404,14 +392,15 @@ class GetPhotometry():
 ### functions to save and inspect photometry
 
 class SavePhotometry():
-    def __init__(self, graceid, action, path_photometry, batch_codes=None, submission_date=None, num_batches_submitted=None, observing_run='O4c'):
+    def __init__(self, graceid, action, path_data, batch_codes=None, submission_date=None, num_batches_submitted=None, observing_run='O4c'):
         self.graceid = graceid
         self.batch_codes = batch_codes
         self.action = action
-        self.path_photometry = path_photometry
+        self.path_data = path_data
         self.submission_date = submission_date
         self.num_batches_submitted = num_batches_submitted
         self.observing_run = observing_run
+        self.path_photometry = f'{path_data}/flare_data/ZFPS/'
     
     def get_coords_batchcode(self):
         """
@@ -611,13 +600,14 @@ class SavePhotometry():
         
 
 class PhotometryLog():
-    def __init__(self, path_pipeline, graceid=None, column=None, value=None, new_row=None):
-        self.path_pipeline = path_pipeline
+    def __init__(self, path_data, graceid=None, column=None, value=None, new_row=None):
+        self.path_data = path_data
         self.graceid = graceid
         self.column = column
         self.value = value
         self.new_row = new_row
 
+        self.path_pipeline = f'{self.path_data}/flare_data/photometry_pipeline.json'
         with open(self.path_pipeline, 'r') as file:
             photometry_pipeline = json.load(file)
         self.photometry_pipeline = photometry_pipeline
@@ -769,15 +759,15 @@ class PhotometryLog():
 
 
 class PlotPhotometry():
-    def __init__(self, observing_run, graceid, path_events_dictionary, path_photometry):
+    def __init__(self, observing_run, graceid, path_data):
         self.observing_run = observing_run
         self.graceid = graceid
-        self.path_events_dictionary = path_events_dictionary
-        self.path_photometry = path_photometry
+        self.path_data = path_data
+        self.path_photometry = f'{path_data}/flare_data/ZFPS/'
 
     def load_event_lightcurves_graceid(self):
         # open the stored event info
-        with gzip.open(f'{self.path_events_dictionary}/dicts/crossmatch_dict_{self.observing_run}.gz', 'rb') as f:
+        with gzip.open(f'{self.path_data}/flare_data/dicts/crossmatch_dict_{self.observing_run}.gz', 'rb') as f:
             crossmatch_dict = pickle.load(f)
         coords = crossmatch_dict[self.graceid]['agn_catnorth']
         name = [str(x['ra']) + '_' + str(x['dec']) for x in coords]
@@ -790,7 +780,7 @@ class PlotPhotometry():
         batch_photometry_filtered = self.load_event_lightcurves_graceid()
         empty=[x for x in batch_photometry_filtered if x.empty]
         # open the stored event info
-        with open(f'{self.path_events_dictionary}/dicts/events_dict_{self.observing_run}.json', 'r') as file:
+        with open(f'{self.path_data}/flare_data/dicts/events_dict_{self.observing_run}.json', 'r') as file:
             events_dict = json.load(file)
         total_matches=events_dict[self.graceid]['crossmatch']['n_agn_catnorth']
         dateobs=events_dict[self.graceid]['gw']['GW MJD']+ 2400000.5
