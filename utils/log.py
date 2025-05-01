@@ -3,6 +3,7 @@ import time
 import os
 
 LOG_DIR = "data/logs"
+verbose = True
 
 def time_stamp():
     """
@@ -13,8 +14,9 @@ def time_stamp():
 
 
 def log(message):
-    timestamp = time_stamp()
-    print(f"{timestamp}: {message}")
+    if verbose:
+        timestamp = time_stamp()
+        print(f"{timestamp}: {message}")
 
     if not os.path.isdir(LOG_DIR):
         os.makedirs(LOG_DIR, exist_ok=True)

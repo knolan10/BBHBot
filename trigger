@@ -2,6 +2,7 @@ from gcn_kafka import Consumer
 import yaml
 import time
 import pickle
+import random
 import threading
 from trigger_utils.trigger_utils import *
 from utils.log import log, heartbeat
@@ -9,6 +10,7 @@ from utils.log import log, heartbeat
 with open('config/Credentials.yaml', 'r') as file:
     credentials = yaml.safe_load(file)
 testing = credentials['testing']
+path_data = credentials['path_data']
 
 log(f'Starting TriggerBot with testing = {testing}')
 
@@ -24,7 +26,12 @@ else:
 
 MLP = pickle.load(open('utils/mlp_model.sav', 'rb'))
 
-config = {'group.id': 'ztfmasstrigger',
+if testing:
+    configid = f'ztfmasstrigger{random.randint(0, 1000000)}'
+else:
+    configid = 'ztfmasstrigger'
+
+config = {'group.id': configid,
           'auto.offset.reset': 'earliest',
           'enable.auto.commit': False,
           'max.poll.interval.ms': 600050}
@@ -66,7 +73,7 @@ while True:
                 skymap_name = params[11]
 
                 # open triggered_events.csv and check for superevent_id
-                triggered, trigger_plan_id = check_triggered_csv(superevent_id)
+                triggered, trigger_plan_id = check_triggered_csv(superevent_id, path_data)
 
                 if (
                     superevent_id[0] != 'S' or
@@ -81,10 +88,10 @@ while True:
                     (alert_type == 'Preliminary' and skymap_name[-1] == 0)
                 ):
                     if triggered:
-                        update_trigger_log(superevent_id, 'valid', False)
+                        #try to remove trigger from ZTF queue
+                        update_trigger_log(superevent_id, 'valid', False, path_data=path_data)
                         delete_trigger_ztf(trigger_plan_id, fritz_token, mode)
-                        log(f'{superevent_id} has trigger but no longer is valid')
-                    
+                        log(f'attempting to remove trigger for {superevent_id}')                    
                     logmessage = f'{superevent_id} did not pass initial criteria'
                     log(logmessage)
                     raise MyException(logmessage)
@@ -94,8 +101,9 @@ while True:
                 mass = m_total_mlp(MLP, distmean, far, dl_bns=168.)
                 if mass < 60:
                     if triggered:
-                        update_trigger_log(superevent_id, 'valid', False)
+                        update_trigger_log(superevent_id, 'valid', False, path_data=path_data)
                         delete_trigger_ztf(trigger_plan_id, fritz_token, mode)
+                        log(f'attempting to remove trigger for {superevent_id}')
                     logmessage = f'{superevent_id} did not pass mass criteria'
                     log(logmessage)
                     raise MyException(logmessage)
@@ -154,8 +162,9 @@ while True:
 
                 if total_time > 5400 or probability < 0.5:
                     if triggered:
-                        update_trigger_log(superevent_id, 'valid', False)
+                        update_trigger_log(superevent_id, 'valid', False, path_data=path_data)
                         delete_trigger_ztf(trigger_plan_id, fritz_token, mode)
+                        log(f'attempting to remove trigger for {superevent_id}')
                     logmessage = f'Followup plan for {superevent_id} with {total_time} seconds and {probability} probability does not meet criteria'
                     log(logmessage)
                     raise MyException(logmessage)
@@ -178,15 +187,11 @@ while True:
                         raise MyException(logmessage)
                     else:
                         # remove current submitted plan so we can submit new one
+                        #TODO: verify that trigger is successfully removed, else raise exception
                         delete_trigger_ztf(trigger_plan_id, fritz_token, mode)
                         logmessage = f'Removing previous trigger for {superevent_id} so we can resubmit updated plan'
                         log(logmessage)
-                        raise MyException(logmessage)
 
-                if testing:
-                    logmessage=f'Plan for {superevent_id} has {total_time} seconds and {probability} probability - but dont trigger in testing mode'
-                    log(logmessage)
-                    raise MyException(logmessage)
 
                 # check if ZTF survey naturaly covered the skymap previous nights
                 #TODO NEED TO UPDATE THIS FUNCTION SO IT CHECKS NOT JUST FOR OBSERVATIONS BUT FOR SUFFICIENT % COVERAGE
@@ -196,7 +201,12 @@ while True:
                     logmessage=f'There is recent coverage of {superevent_id} - not triggering'
                     log(logmessage)
                     raise MyException(logmessage)
-
+                
+                if testing:
+                    logmessage=f'Plan for {superevent_id} is good - but dont trigger in testing mode'
+                    log(logmessage)
+                    raise MyException(logmessage)
+                
                 # send plan to ZTF queue
                 trigger_ztf(observation_plan_request_id, fritz_token, mode)
                 log(f'Triggered ZTF for {superevent_id} at {Time.now()}')
@@ -206,7 +216,7 @@ while True:
                 gcn_type = (alert_type, skymap_name)
                 queued_plan = (observation_plan_request_id, start_observation)
                 valid = True
-                add_triggercsv(superevent_id, dateobs, gcn_type, gcnevent_id, localization_id, queued_plan, trigger_cadence, valid)         
+                add_triggercsv(superevent_id, dateobs, gcn_type, gcnevent_id, localization_id, queued_plan, trigger_cadence, valid, path_data)         
                 message = f'ZTF Triggered for {superevent_id}'
                 send_trigger_email(credentials, message, dateobs)
 

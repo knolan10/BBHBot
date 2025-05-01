@@ -1,9 +1,16 @@
 astropy
 astropy-healpix
 astroplan
+ligo.skymap
+matplotlib
 numpy
 gcn_kafka
 pandas
+penquins
 PyYAML
+requests
+seaborn
 scikit-learn
+scipy
+smtplib
 xmltodict

@@ -4,10 +4,11 @@ from flares_utils.flares_utils import *
 from utils.log import log
 import time
 import yaml
+
 class MyException(Exception):
     pass
 
-print(f"Starting FlareBot at {Time.now()}")
+log(f"Starting FlareBot at {Time.now()}")
 
 #settings / credentials
 with open('config/Credentials.yaml', 'r') as file:
@@ -15,24 +16,26 @@ with open('config/Credentials.yaml', 'r') as file:
 testing = credentials['testing']
 path_to_data = credentials['path_to_data']
 observing_run = credentials['observing_run']
-email = credentials['zfps_email']
-userpass = credentials['zfps_userpass']
-auth_username = credentials['zfps_auth']['username']
-auth_password = credentials['zfps_auth']['password'] 
+zfps_email = credentials['zfps_email']
+zfps_userpass = credentials['zfps_userpass']
+zfps_auth_username = credentials['zfps_auth']['username']
+zfps_auth_password = credentials['zfps_auth']['password'] 
 allocation= credentials['allocation']
 fritz_token = credentials['fritz_token']
 kowalski_password = credentials['kowalski_password']
 github_token= credentials['github_token']
 
 # Part 0 : load current photometry status
-print("------------------PART 0: Check status, try to submit queued requests------------------")
+log("------------------PART 0: Check status, try to submit queued requests------------------")
 do_photometry = True # this flag will be changed to false if we hit the 15000 request limit
-followup = PhotometryLog(path_to_data)
+followup = PhotometryLog(path_to_data, email=zfps_email, userpass=zfps_userpass, auth_username=zfps_auth_username, auth_password=zfps_auth_password)
 followup.check_completed_events() #if events are out of 200 day window, edit log so we stop checking them
 # action items :
 needs_photometry_request, waiting_for_photometry = followup.check_photometry_status()
 
 number_pending_requests = followup.check_num_pending_zfps()
+logmessage = f'{number_pending_requests} pending requests'
+log(logmessage)
 if number_pending_requests > 15000: # ZFPS limit
     do_photometry = False
 
@@ -43,7 +46,7 @@ time.sleep(30)
 if do_photometry:
     queued_photometry = PhotometryCoords.retrieve_queue_photometry(path_to_data)
     if len(queued_photometry) > 0:
-        print(f"Found {len(queued_photometry)} queued photometry requests")
+        log(f"Found {len(queued_photometry)} queued photometry requests")
         for x in queued_photometry:
             id = x[0]
             ra = x[1]
@@ -54,9 +57,9 @@ if do_photometry:
             file_name = x[6]
             if number_pending_requests + number_to_submit > 15000:
                 do_photometry = False
-                print('Not submitting queued request - still too many pending')
+                log(f'Not submitting queued request for {id} - still too many pending')
                 break
-            print(f"Submitting {number_to_submit} queued photometry coords for event {id}")
+            log(f"Submitting {number_to_submit} queued photometry coords for event {id}")
             submission = GetPhotometry(ra=ra,
                     dec=dec,
                     jd=jd,
@@ -77,24 +80,24 @@ if do_photometry:
                     "from_queue": True
                 }
                 followup.add_zfps_entry(event_id=id, 
-                                                new_entry=new_zfps_entry)
+                                        new_entry=new_zfps_entry)
                 number_pending_requests += submission[1]
-                if number_pending_requests > 15000:
-                    do_photometry = False
                 # move the file of queued photometry into another "completed queued" directory - could periodically delete these
                 PhotometryCoords.move_complete_queued_photometry(file_name, path_to_data)
+                log(f"Completed queued photometry submission for {id}")
             else:
-                print("Error submitting queued photometry")
+                log(f"Error submitting queued photometry for {id}")
 
 time.sleep(30)
 
 ###Part 1 : injest new events, and along with scheduled updates, request photometry
-print("-------------------------------PART 1: Photometry Requests-------------------------------")
+log("-------------------------------PART 1: Photometry Requests-------------------------------")
 
 #check gracedb for new events
 params = GetSuperevents(path_data=path_to_data, 
                         event_source='gracedb',
                         observing_run=observing_run).get_new_events()
+log(f'found {len(params)} new events')
 
 #check the trigger status of new events on Fritz
 eventid = [x[0] for x in params]
@@ -108,7 +111,8 @@ trigger_status = Fritz(eventid, dateid, a90, far, mass, allocation, fritz_token)
 #save the new events to dictionary
 df = NewEventsToDict(params, 
                     trigger_status, 
-                    path_to_data).save_data()
+                    path_to_data,
+                    testing).save_data()
 
 #get catnorth crossmatches
 skymap_str = [x[18] for x in params]
@@ -128,21 +132,20 @@ matches = crossmatch.get_crossmatches()
 df, priority, trigger_df, error_triggers = PushEventsPublic(path_to_data,
                                                             github_token,
                                                             observing_run=observing_run,
-                                                            testing=testing, 
-                                                            verbose=True).format_and_push()
+                                                            testing=testing).format_and_push()
 
 # get triggered events for automatated photometry request
 for id, date, trigger in zip(eventid, dateobs, trigger_status):
     zfps = None
     if trigger[0] == 'correct' and trigger[1] != 'triggered':
-        print(f"no trigger, so not ZFPS request for {id}")
+        log(f"no trigger, so not ZFPS request for {id}")
         continue
     if trigger[0]!='correct' or trigger[1] != 'triggered':
-        print(f"need to inspect event {id} for trigger status: {trigger}")
+        log(f"need to inspect event {id} for trigger status: {trigger}")
         zfps = "did not make new request"
     time_since_event = Time.now().jd - Time(date).jd
     if time_since_event > 7: # safeguard: don't automatically request if more than a week has passed
-        print(f"Not automatically requesting photometry for event {id} because it has been more than 7 days")
+        log(f"Not automatically requesting photometry for event {id} because it has been more than 7 days")
         zfps = "missed new request"
     if zfps:
         # save these failed automatic ZFPS for inspection
@@ -154,6 +157,7 @@ for id, date, trigger in zip(eventid, dateobs, trigger_status):
             ]
         }
         followup.add_event(id, event_data)
+        log(f"Found event {id} to request new photometry for")
         continue
     # events that have made it this far need new photometry request, we append them to any update requests scheduled
     needs_photometry_request.append([id,date,'new'])
@@ -162,7 +166,7 @@ for id, date, trigger in zip(eventid, dateobs, trigger_status):
 # for update events, update photometry for all locally saved AGN
 for x in needs_photometry_request:
     id, date, action = x[0], x[1], x[2]    
-    print(f"Submitting {action} photometry request for event {id}")
+    log(f"Submitting {action} photometry request for event {id}")
     coords = PhotometryCoords(action=action, 
                                 graceid=id, 
                                 catalog='catnorth', 
@@ -183,6 +187,7 @@ for x in needs_photometry_request:
         }
         followup.add_event(id, event_data)
         coords.queue_photometry(ra, dec, jd, number_agn)
+        log(f"Not submitting {action} photometry request for event {id} - too many pending requests")
         do_photometry = False
         continue
         
@@ -190,10 +195,10 @@ for x in needs_photometry_request:
                 dec,
                 jd,
                 id,
-                auth_username, 
-                auth_password,
-                email, 
-                userpass,
+                zfps_auth_username, 
+                zfps_auth_password,
+                zfps_email, 
+                zfps_userpass,
                 observing_run=observing_run,
                 testing=testing).submit()
 
@@ -228,17 +233,22 @@ followup.save_num_pending(number_pending_requests)
 time.sleep(30)
 
 #PART 2 : address waiting_for_photometry 
-print("----------------------------------PART 2: Retrieve Photometry----------------------------------")
-print(f"Checking {len(waiting_for_photometry)} photometry requests")
+log("----------------------------------PART 2: Retrieve Photometry----------------------------------")
+log(f"Checking {len(waiting_for_photometry)} photometry requests")
 check_for_flares = []
 for x in waiting_for_photometry:
     id, date_submitted, num_batches, action = x[0], x[1], x[2], x[3]
-    print(f"Now checking {num_batches} batches {action} request for event {id} on {date_submitted}")
+    log(f"Now checking {num_batches} batches {action} request for event {id} on {date_submitted}")
     save_photometry = SavePhotometry(graceid=id, 
                                      action=action, 
                                      path_data=path_to_data, 
                                      submission_date=date_submitted, 
-                                     num_batches_submitted=num_batches)
+                                     num_batches_submitted=num_batches,
+                                     testing=testing, 
+                                     email=zfps_email,
+                                     userpass=zfps_userpass, 
+                                     auth_username=zfps_auth_username, 
+                                     auth_password=zfps_auth_password)
     saved = save_photometry.save()
     if saved: # if we don't return the number of batches submitted, we will try again the next day
         # make a log of the photometry that was returned
@@ -250,7 +260,7 @@ for x in waiting_for_photometry:
         check_for_flares.append(id)
 
 
-print("---------------------------------PART 3: Flare identification---------------------------------")
+log("---------------------------------PART 3: Flare identification---------------------------------")
 check_for_flares = list(set(check_for_flares)) 
 for id in check_for_flares:
     # check for flares (will overwrite previouse flare checks each time)
@@ -259,11 +269,13 @@ for id in check_for_flares:
                             observing_run=observing_run).process_for_flare()
     rolling_stats = RollingWindowStats(graceid=id, 
                             agn=AGN, 
-                            path_data=path_to_data).get_rolling_window_stats()
+                            path_data=path_to_data,
+                            observing_run=observing_run).get_rolling_window_stats()
     g, r, i, gr, gri = RollingWindowHeuristic(graceid=id, 
                                         agn=AGN, 
                                         rolling_stats=rolling_stats, 
                                         path_data=path_to_data,
                                         percent=0.6, 
                                         k_mad=3, 
-                                        save=True).get_flares()
+                                        testing=testing,
+                                        observing_run=observing_run).get_flares()

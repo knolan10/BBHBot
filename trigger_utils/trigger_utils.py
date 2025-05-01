@@ -325,8 +325,8 @@ def generate_cadence_dates(date):
     new_dates = [(date_only + timedelta(days=days)).strftime('%Y-%m-%d') for days in cadence]
     return new_dates
 
-def check_triggered_csv(superevent_id):
-    df = pd.read_csv('./data/triggered_events.csv')
+def check_triggered_csv(superevent_id, path_data):
+    df = pd.read_csv(f'{path_data}/trigger_data/triggered_events.csv')
     triggered = superevent_id in df['superevent_id'].values
     if triggered:
         trigger_plan_id = df[df['superevent_id'] == superevent_id]['observation_plan_id'].values[0]
@@ -334,8 +334,8 @@ def check_triggered_csv(superevent_id):
         trigger_plan_id = None
     return triggered, trigger_plan_id
 
-def update_trigger_log(superevent_id_to_check, column, value, append_string=False, remove_string=False):
-    df = pd.read_csv('./data/triggered_events.csv')
+def update_trigger_log(superevent_id_to_check, column, value, path_data, append_string=False, remove_string=False):
+    df = pd.read_csv(f'{path_data}/trigger_data/triggered_events.csv')
     if append_string:
         current_value = df.loc[df['superevent_id'] == superevent_id_to_check, column].values[0]
         separator = ','
@@ -354,7 +354,7 @@ def update_trigger_log(superevent_id_to_check, column, value, append_string=Fals
         df.loc[df['superevent_id'] == superevent_id_to_check, column] = value
     df.to_csv('./data/triggered_events.csv', index=False)
 
-def add_triggercsv(superevent_id, dateobs, gcn_type, gcnid, localizationid, queued_plan, trigger_cadence, valid):
+def add_triggercsv(superevent_id, dateobs, gcn_type, gcnid, localizationid, queued_plan, trigger_cadence, valid, path_data):
     # Create a DataFrame with the new event data
     new_event = pd.DataFrame([{
         'superevent_id': superevent_id,
@@ -370,7 +370,7 @@ def add_triggercsv(superevent_id, dateobs, gcn_type, gcnid, localizationid, queu
     }])
 
     # Append the new event to the existing CSV file
-    new_event.to_csv('./data/triggered_events.csv', mode='a', header=False, index=False)
+    new_event.to_csv(f'{path_data}/trigger_data/triggered_events.csv', mode='a', header=False, index=False)
 
 
 def send_email(sender_email, sender_password, recipient_emails, subject, body):

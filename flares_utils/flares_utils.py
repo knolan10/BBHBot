@@ -8,6 +8,7 @@ import os
 from scipy import stats
 import math
 from astropy.time import Time
+from utils.log import log
 
 class FlarePreprocessing():
     def __init__(self, graceid, path_data, observing_run='O4c'):
@@ -77,7 +78,7 @@ class FlarePreprocessing():
         single_filter_r = [self.get_single_filter('ZTF_r', lc) for lc in df_with_mag]
         single_filter_i = [self.get_single_filter('ZTF_i', lc) for lc in df_with_mag]
         AGN = list(zip(single_filter_g, single_filter_r, single_filter_i, radec))
-        print(f'found {len(AGN)} AGN')
+        log(f'found {len(AGN)} AGN')
         return AGN
 
 
@@ -160,14 +161,14 @@ class RollingWindowStats():
 # heuristic
         
 class RollingWindowHeuristic:
-    def __init__(self, graceid, agn, rolling_stats, path_data, percent=1, k_mad=3, save=False, observing_run='O4c'):
+    def __init__(self, graceid, agn, rolling_stats, path_data, percent=1, k_mad=3, testing=False, observing_run='O4c'):
         self.graceid = graceid
         self.agn = agn
         self.rolling_stats = rolling_stats
         self.path_data = path_data
         self.percent = percent  
         self.k_mad = k_mad
-        self.save = save
+        self.testing=testing
         self.observing_run = observing_run
 
     def medians_test(self):
@@ -189,7 +190,7 @@ class RollingWindowHeuristic:
         index_i = [i for i in range(len(stats_i)) 
                 if not (np.isnan(stats_i[i][0]).all() or np.isnan(stats_i[i][1]).all() or np.isnan(stats_i[i][2]).all())
                 and sum(x > np.nanmin(stats_i[i][2]) for x in np.array(stats_i[i][0]) - self.k_mad * np.array(stats_i[i][1])) / len(stats_i[0]) > self.percent]
-        print (f'in g,r,i we find {len(index_g)},{len(index_r)},{len(index_i)} candidates')
+        log(f'in g,r,i we find {len(index_g)},{len(index_r)},{len(index_i)} candidates')
         return index_g, index_r, index_i
     
     def flares_across_filters(self, g,r,i):
@@ -197,9 +198,9 @@ class RollingWindowHeuristic:
         find detections in common between different colors
         """
         gr = np.intersect1d(g,r)
-        print(f'{len(gr)} AGN have flares in g and r filters')
+        log(f'{len(gr)} AGN have flares in g and r filters')
         gri = np.intersect1d(i,gr)
-        print(f'{len(gri)} AGN have flares in g, r, and i filters')
+        log(f'{len(gri)} AGN have flares in g, r, and i filters')
         return gr, gri
      
     def check_photometry_coverage(self):  
@@ -212,14 +213,14 @@ class RollingWindowHeuristic:
         #cut from consideration bc no baseline points
         no_baseline_points = [i for i in self.rolling_stats if is_all_nan(i[0][0]) and is_all_nan(i[1][0]) and is_all_nan(i[2][0])]
         number_no_baseline_points = len(no_baseline_points)
-        print(number_no_gw_points, '/', input, 'have no observations in any color in 200 day post GW period')
-        print(number_no_baseline_points, '/', input, 'have no observations in any color before the GW detection')
+        log(number_no_gw_points, '/', input, 'have no observations in any color in 200 day post GW period')
+        log(number_no_baseline_points, '/', input, 'have no observations in any color before the GW detection')
         return number_no_gw_points, number_no_baseline_points
     
     def get_flares(self):
         g,r,i = self.medians_test()
         unique_index = list(set(g+r+i))
-        print(f'{len(unique_index)} unique flares across all colors')
+        log(f'{len(unique_index)} unique flares across all colors')
         gr, gri = self.flares_across_filters(g,r,i)
         radec = [i[3] for i in self.agn]
         flare_coords_g = [radec[x] for x in g]
@@ -227,33 +228,35 @@ class RollingWindowHeuristic:
         flare_coords_i = [radec[x] for x in i]
 
         number_no_gw_points, number_no_baseline_points = self.check_photometry_coverage()
-        if self.save:
-            anomalous_dict = {self.graceid: {'catnorth_agn_with_photometry': len(self.agn), 
-                                            "no_baseline_points": number_no_baseline_points, "no_gw_points": number_no_gw_points,
-                                            "number unique flares": len(unique_index),
-                                            'number_g': len(g), 'number_r': len(r),'number_i': len(i),
-                                            'coords_g': flare_coords_g, 'coords_r': flare_coords_r, 'coords_i': flare_coords_i,}}
+        anomalous_dict = {self.graceid: {'catnorth_agn_with_photometry': len(self.agn), 
+                                        "no_baseline_points": number_no_baseline_points, "no_gw_points": number_no_gw_points,
+                                        "number unique flares": len(unique_index),
+                                        'number_g': len(g), 'number_r': len(r),'number_i': len(i),
+                                        'coords_g': flare_coords_g, 'coords_r': flare_coords_r, 'coords_i': flare_coords_i,}}
 
+        if not self.testing:
             with open(f'{self.path_data}/flare_data/dicts/events_dict_{self.observing_run}.json', 'r') as file:
                 events_dict_add = json.load(file)
 
-            # add new values to flare key without replacing existing values
-            for key, value in anomalous_dict.items():
-                if key in events_dict_add:
-                    if 'flare' in events_dict_add[key]:
-                        events_dict_add[key]['flare'].update(value)
-                    else:
-                        events_dict_add[key]['flare'] = value
+        # add new values to flare key without replacing existing values
+        for key, value in anomalous_dict.items():
+            if key in events_dict_add:
+                if 'flare' in events_dict_add[key]:
+                    events_dict_add[key]['flare'].update(value)
+                else:
+                    events_dict_add[key]['flare'] = value
+        if not self.testing:
             with open(f'{self.path_data}/flare_data/dicts/events_dict_{self.observing_run}.json', 'w') as file:
                 json.dump(events_dict_add, file)
-            
-            # publish to public repo
-            data = {
-                "flare_coords_g": flare_coords_g,
-                "flare_coords_r": flare_coords_r,
-                "flare_coords_i": flare_coords_i
-            }
-            directory = f"{self.path_data}/flares"
+        
+        # publish to public repo
+        data = {
+            "flare_coords_g": flare_coords_g,
+            "flare_coords_r": flare_coords_r,
+            "flare_coords_i": flare_coords_i
+        }
+        directory = f"{self.path_data}/flares"
+        if not self.testing:
             os.makedirs(directory, exist_ok=True)
             path = f"{directory}/{self.graceid}.json"
             with open(path, 'w') as json_file:
@@ -297,7 +300,7 @@ class Plotter:
                 common_values = set()  # Handle empty list of lists
             # Convert the result back to a list
             selected_flares = list(common_values)
-            print(f'{len(selected_flares)} AGN have flares in {flares_from_graceid} band(s)')
+            log(f'{len(selected_flares)} AGN have flares in {flares_from_graceid} band(s)')
             #get indices for these flares
             all_AGN_coords = [agn[3] for agn in self.agn]
             flare_indices = [i for i, value in enumerate(all_AGN_coords) if value in selected_flares]

@@ -6,3 +6,7 @@ data/flare_data/completed_queued_photometry
 data/flare_data/ZFPS
 
 dev/data/
+
+flares_utils/__pycache__
+trigger_utils/__pycache__
+trigger_utils/__pycache__/trigger_utils.cpython-312.pyc
