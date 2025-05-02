@@ -713,7 +713,7 @@ class PushEventsPublic():
             subprocess.run(['git', 'add', path_events_summary], check=True)
 
             # Check for changes in the repository
-            result = subprocess.run(['git', 'status', '--porcelain'], capture_output=True, text=True)
+            result = subprocess.run(['git', 'status', '--porcelain', f'{self.path_data}/events_summary'], capture_output=True, text=True)
             if not result.stdout.strip():
                 print("No changes to commit in the events_summary directory.")
                 return

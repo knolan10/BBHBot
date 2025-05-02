@@ -38,8 +38,6 @@ print(f'{number_pending_requests} pending requests')
 if number_pending_requests > 15000: # ZFPS limit
     do_photometry = False
 
-time.sleep(30)
-
 # check for queued photometry requests (if we previously hit the 15000 limit)
 #if not testing and do_photometry:
 if do_photometry:
@@ -86,8 +84,6 @@ if do_photometry:
                 print(f"Completed queued photometry submission for {id}")
             else:
                 print(f"Error submitting queued photometry for {id}")
-
-time.sleep(30)
 
 ###Part 1 : injest new events, and along with scheduled updates, request photometry
 print("-------------------------------PART 1: Photometry Requests-------------------------------")
@@ -231,8 +227,6 @@ for x in needs_photometry_request:
 # save number of updated pending requests
 followup.save_num_pending(number_pending_requests)
 
-time.sleep(30)
-
 #PART 2 : address waiting_for_photometry 
 print("----------------------------------PART 2: Retrieve Photometry----------------------------------")
 print(f"Checking {len(waiting_for_photometry)} photometry requests")
@@ -263,6 +257,8 @@ for x in waiting_for_photometry:
 
 print("---------------------------------PART 3: Flare identification---------------------------------")
 check_for_flares = list(set(check_for_flares)) 
+if len(check_for_flares) == 0:
+    print("No new photometry to check for flares")
 for id in check_for_flares:
     # check for flares (will overwrite previouse flare checks each time)
     AGN = FlarePreprocessing(graceid=id, 
