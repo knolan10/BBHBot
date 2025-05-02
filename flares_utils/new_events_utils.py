@@ -648,51 +648,6 @@ class PushEventsPublic():
         plt.ylim(0, 0.2)
         plt.show()
 
-    # def push_changes_to_repo(self):
-    #     """
-    #     Push changes in the events_summary directory to the remote GitHub repository.
-    #     """
-    #     commit_message = 'automated push of new events'
-    #     try:
-    #         if not self.github_token:
-    #             raise ValueError("GitHub token is missing. Please provide a valid token.")
-            
-    #         remote_url = f'https://{self.github_token}@github.com/knolan10/BBHBot.git'
-    #         path_events_summary = f'{self.path_data}/events_summary'
-
-            
-    #         # Set the remote URL for the repository
-    #         subprocess.run(['git', '-C', repo_root, 'remote', 'set-url', 'origin', remote_url], check=True)
-            
-    #         # Stage changes in the events_summary directory
-    #         subprocess.run(['git', '-C', repo_root, 'add', path_events_summary], check=True)
-            
-    #         # Check the status of the repository, filtering for changes in events_summary
-    #         result = subprocess.run(['git', '-C', repo_root, 'status', '--porcelain'], capture_output=True, text=True)
-    #         changes = [line for line in result.stdout.splitlines() if line.startswith('A ') or line.startswith('M ') or line.startswith('D ')]
-    #         changes_in_summary = [line for line in changes if line.endswith(path_events_summary)]
-            
-    #         # Commit changes if there are any in the events_summary directory
-    #         if not changes_in_summary:
-    #             print("No changes to commit in the events_summary directory.")
-    #         else:
-    #             subprocess.run(['git', '-C', repo_root, 'commit', '-m', commit_message], check=True)
-                
-    #             # Check for new commits to push
-    #             push_check = subprocess.run(['git', '-C', repo_root, 'log', 'origin/main..HEAD'], capture_output=True, text=True)
-    #             if not push_check.stdout.strip():
-    #                 print("No new commits to push. Repository is up to date.")
-    #             else:
-    #                 # Push changes to the remote repository
-    #                 subprocess.run(['git', '-C', repo_root, 'push', 'origin', 'main'], check=True)
-    #                 print("Changes pushed to the repository successfully.")
-    #     except subprocess.CalledProcessError as e:
-    #         print(f"An error occurred while running a git command: {e}")
-    #     except ValueError as ve:
-    #         print(f"Error: {ve}")
-    #     except Exception as ex:
-    #         print(f"An unexpected error occurred: {ex}")
-
 
     def push_changes_to_repo(self):
         """

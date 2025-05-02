@@ -1,9 +1,9 @@
 from trigger_utils.cadence_utils import *
-from trigger_utils.trigger_utils import *#submit_plan, get_plan_stats, trigger_ztf, update_trigger_log, send_trigger_email
+from trigger_utils.trigger_utils import submit_plan, get_plan_stats, trigger_ztf, update_trigger_log, send_trigger_email
 import yaml
 import time
 
-print(f"Starting FlareBot on {Time.now()}")
+print(f"Starting cadence.py at {Time.now()}")
 
 with open('config/Credentials.yaml', 'r') as file:
     credentials = yaml.safe_load(file)
@@ -22,7 +22,7 @@ else:
 
 
 # look at any pending observations and determine whether we were successful in observing, if within 2 days automatically retry
-retry = parse_pending_observation(path_data, fritz_token, mode, testing)
+retry = parse_pending_observation(path_data, fritz_token, mode)
 print(f'retry: {retry}')
 
 # check if it is time for any follow-up triggers

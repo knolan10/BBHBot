@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 from astropy.time import Time, TimeDelta
-from trigger_utils import update_trigger_log, check_executed_observation, send_trigger_email
+from .trigger_utils import update_trigger_log, check_executed_observation
 
 class MyException(Exception):
     pass
@@ -69,8 +69,8 @@ def parse_pending_observation(path_data, fritz_token, mode):
                 dateobs = x[6]
                 if not within_time:
                     # ~2 days post trigger and still unsuccessful - handle manually
-                    update_trigger_log(superevent_id, 'unsuccessful_observation', observation_info, append_string=True)
-                    update_trigger_log(superevent_id, 'pending_observation', observation_info, remove_string=True)
+                    update_trigger_log(superevent_id, 'unsuccessful_observation', observation_info, path_data=path_data, append_string=True)
+                    update_trigger_log(superevent_id, 'pending_observation', observation_info, path_data=path_data, remove_string=True)
                     print(f'We did not sucessfully observe the queued plans for {superevent_id}')
                     continue
                 enddate = (Time(dateobs) + TimeDelta(3, format='jd')).iso
@@ -78,8 +78,8 @@ def parse_pending_observation(path_data, fritz_token, mode):
                 observations = check_executed_observation(dateobs, enddate, gcnid, fritz_token, mode)
                 if observations['data']['totalMatches'] >= 1:
                     print(f'Observation of {superevent_id} successful')  
-                    update_trigger_log(superevent_id, 'successful_observation', observation_info, append_string=True)
-                    update_trigger_log(superevent_id, 'pending_observation', observation_info, remove_string=True)
+                    update_trigger_log(superevent_id, 'successful_observation', observation_info, path_data=path_data, append_string=True)
+                    update_trigger_log(superevent_id, 'pending_observation', observation_info, path_data=path_data, remove_string=True)
                 else:
                     retry.append(['retry', superevent_id, gcnid, localizationid, dateobs]) 
                     print(f"Trigger not successful for {superevent_id} - retrying for tonight")
