@@ -26,7 +26,6 @@ import ligo.skymap.postprocess
 from ligo.gracedb.rest import GraceDb
 g = GraceDb()  
 from penquins import Kowalski
-from utils.log import log
 
 class GetSuperevents():
     def __init__(self, path_data, event_source, mlp_modelpath='utils/mlp_model.sav', observing_run='O4c', kafka_response=None, retrieve_all=False):
@@ -37,9 +36,9 @@ class GetSuperevents():
         self.kafka_response = kafka_response
         self.retrieve_all = retrieve_all
 
-    # TODO : cut unused params returned
     # TODO : add a date to the gracedb query so we aren't getting all of 04b/O4c etc
-    # TODO : add option to update all events, ie to catch update alerts
+    # TODO : add option to update all events, ie to catch updated alert values
+    # TODO : retrun params as dictionary, remove these values: group, significant, prob_bbh, prob_ter, skymap_url, diststd, skymap_str, zmin, zmax, skymap
     
     """
     get new events that haven't been processed yet
@@ -49,6 +48,7 @@ class GetSuperevents():
     zmax, skymap, mass
     """
     def read_from_gracedb(self, ids, files):
+        # TODO: assuming there is a better way to select the most recent gcn
         superevent_files = [i['links']['files'] for i in files]
         event_files = [g.files(graceid).json() for graceid in ids]
         file = [
@@ -95,7 +95,7 @@ class GetSuperevents():
             fritz_dateid = dateobs.strftime('%Y-%m-%dT%H:%M:%S')
             return superevent_id, event_page, alert_type, instrument, pipeline, group, significant, prob_bbh, prob_ter, far_format, skymap_url, date, fritz_dateid
         except:
-            log(f'error loading xml: {response}')
+            print(f'error loading xml: {response}')
 
     def proc_skymap(self, skymap_url):
         skymap_response = requests.get(skymap_url)
@@ -132,7 +132,7 @@ class GetSuperevents():
             zmax = cos.z_at_value(cosmo.luminosity_distance, (distmean + 3 * diststd) * u.Mpc, method='bounded').value
             return distmean, diststd, dateobs_str, a90, a50, skymap_str, zmin, zmax, skymap
         except:
-            log(f'error loading skymap {skymap_url}')
+            print(f'error loading skymap {skymap_url}')
             return 'None'
         
     def m_total_mlp(self, MLP_model, dl_bbh, far, dl_bns=168.):
@@ -146,7 +146,7 @@ class GetSuperevents():
         if self.event_source == 'gracedb':
             event_iterator = g.superevents(f'runid: {self.observing_run} SIGNIF_LOCKED')
             graceids = [superevent['superevent_id'] for superevent in event_iterator]
-            log(f'{len(graceids)} significant superevents in {self.observing_run}')
+            print(f'{len(graceids)} significant superevents in {self.observing_run}')
             responses = [g.superevent(id) for id in graceids]
             data = [r.json() for r in responses]
             if not self.retrieve_all:
@@ -161,7 +161,7 @@ class GetSuperevents():
         gcn_params = [self.get_params(url) for url in response]
         low_prob_bbh = [x for x in gcn_params if x[7] < 0.5 or x[8] > 0.3]
         params = [x for x in gcn_params if x[7] > 0.5 and x[8] < 0.3]
-        log(f'{len(params)} new events to process (cut {len(low_prob_bbh)} low prob bbh events)')
+        print(f'{len(params)} new events to process (cut {len(low_prob_bbh)} low prob bbh events)')
         skymap_urls = [x[10] for x in params]
         skymap_data = [self.extract_skymap_params(url) for url in skymap_urls]
         # mass
@@ -193,7 +193,7 @@ class Fritz():
             json_data = json.loads(json_string)            
             return json_data
         else:
-            log(response.status_code)
+            print(response.status_code)
             return None
         
     # get the statistics for a potential observation plan
@@ -202,14 +202,14 @@ class Fritz():
         #handling events without plan requests
         if len(matching_requests) == 0:
             if datetime.fromisoformat(dateid) < datetime.fromisoformat('2024-09-14T00:00:00'):
-                log(f'{eventid} predates trigger')
+                print(f'{eventid} predates trigger')
                 return ["correct", 'predates trigger']
             else:
                 if far < 10 or a90 > 1000 or mass < 60:
-                    log(f'Event doesnt pass criteria - correct no plan request for {eventid}')
+                    print(f'Event doesnt pass criteria - correct no plan request for {eventid}')
                     return ["correct", "not triggered"]
                 else:
-                    log(f'Error: should have requested plan for {eventid}')
+                    print(f'Error: should have requested plan for {eventid}')
                     trigger_status = "missed plan request"
                     return ['error', 'missed plan request']
         # now only considering events that have a plan request
@@ -224,10 +224,10 @@ class Fritz():
             # stop considering events that predate the trigger
             if datetime.fromisoformat(dateid) < datetime.fromisoformat('2024-09-14T00:00:00'):
                 if trigger_status == 'triggered':
-                    log(f'{eventid} trigger predating automated trigger')
+                    print(f'{eventid} trigger predating automated trigger')
                     return ['correct','non-automated trigger']
                 else:
-                    log(f'{eventid} predates trigger')
+                    print(f'{eventid} predates trigger')
                     return ['correct','predates trigger']
             # now down to events with plans while the trigger is operational
             else:
@@ -237,17 +237,17 @@ class Fritz():
                     # look at stats for the submitted plan
                     plans = [x for x in matching_requests if x['status'] == 'submitted to telescope queue']
                     if len(plans) != 1:
-                        log(f'Multiple triggers: inspect {eventid}')
+                        print(f'Multiple triggers: inspect {eventid}')
                         return ['inspect','multiple triggers']
                 # the not triggered case
                 else:
                     plans = [x for x in matching_requests if x['observation_plans'][0]['statistics'] and x['observation_plans'][0]['statistics'][0]['statistics']['num_observations'] != 0]
                     if not plans:
                         if far < 10 or a90 > 1000 or mass < 60:
-                            log(f'requested plan when we shouldnt have but correctly didnt trigger - parameters dont pass criteria {eventid}')
+                            print(f'requested plan when we shouldnt have but correctly didnt trigger - parameters dont pass criteria {eventid}')
                             return ['correct',"not triggered"]
                         else:
-                            log(f'No valid plans found for {eventid}')
+                            print(f'No valid plans found for {eventid}')
                             return ['error','no valid plan']
                 #for non triggered events take the most recent plan as truth, ie if earlier plan passes criteria but later one doesn't go by the later one
                 most_recent_plan = max(plans, key=lambda x: x['modified'])
@@ -267,16 +267,16 @@ class Fritz():
                     intended_trigger_status = "triggered"
                 # compare the trigger status to the intended trigger status
                 if trigger_status == "triggered" and intended_trigger_status == "triggered":
-                    log(f'triggered on {eventid}')
+                    print(f'triggered on {eventid}')
                     return ['correct','triggered', total_time, probability, start]
                 elif trigger_status == "triggered" and intended_trigger_status == "not triggered":
-                    log(f'Error: bad trigger for {eventid}')
+                    print(f'Error: bad trigger for {eventid}')
                     return ['error','bad trigger', total_time, probability, start]
                 elif trigger_status == "not triggered" and intended_trigger_status == "triggered":
-                    log(f'Error: missed trigger for {eventid}')
+                    print(f'Error: missed trigger for {eventid}')
                     return ['error','missed trigger', total_time, probability, start]
                 elif trigger_status == "not triggered" and intended_trigger_status == "not triggered":
-                    log(f'not triggered on {eventid}')
+                    print(f'not triggered on {eventid}')
                     return ['correct','not triggered', total_time, probability, start]
         
     def get_trigger_status(self):    
@@ -289,11 +289,11 @@ class Fritz():
         error = [(i, x) for i, x in enumerate(trigger_status) if x[0] == 'error']
         correct = [(i, x) for i, x in enumerate(trigger_status) if x[0] == 'correct']
         inspect = [(i, x) for i, x in enumerate(trigger_status) if x[0] == 'inspect']
-        log(f'{len(error)} errors, {len(correct)} correct, {len(inspect)} inspect') 
+        print(f'{len(error)} errors, {len(correct)} correct, {len(inspect)} inspect') 
         for x in error:
             index = x[0]
             event = self.eventid[index]
-            log(f'error: {event}: {x[1][1]}')
+            print(f'error: {event}: {x[1][1]}')
         maunual_edits = {
             "S240921cw": ['correct', 'not triggered', 0, 0, ''], # moon too close ?
             "S241125n": ['correct', 'triggered', 900, 0.5, ''], # the Swift/Bat coincident detection
@@ -388,18 +388,18 @@ class NewEventsToDict():
                 events_dict_add[key]['gw']['trigger plan']['cadence'] = new_events_df.at[key, 'cadence'] if 'cadence' in new_events_df.columns else ''
 
         if len(new_events_df) == 0:
-            log('No new events to add')
+            print('No new events to add')
             return None
         
         if not self.testing: # save automatically
             with open(f'{self.path_data}/flare_data/dicts/events_dict_{self.observing_run}.json', 'w') as file:
                 json.dump(events_dict_add, file)
-            log("New events saved to dictionary.")
+            print("New events saved to dictionary.")
         return new_events_df
 
 
 class KowalskiCrossmatch():
-    def __init__(self, localization_name, skymap_str, dateobs, zmin, zmax, path_data, observing_run='O4c', catalogs=['catnorth'], mindec=-90, contour=90, testing=False, kowalski_password=None): 
+    def __init__(self, localization_name, skymap_str, dateobs, zmin, zmax, path_data, observing_run='O4c', catalogs=['catnorth'], mindec=-90, contour=90, testing=False, kowalski_username=None, kowalski_password=None): 
         self.localization_name = localization_name
         self.skymap_str = skymap_str
         self.dateobs = dateobs
@@ -411,7 +411,8 @@ class KowalskiCrossmatch():
         self.mindec = mindec
         self.contour = contour
         self.testing = testing
-        self.kowalski_password = kowalski_password # defined above
+        self.kowalski_username = kowalski_username 
+        self.kowalski_password = kowalski_password 
         self.kowalski = self.connect_kowalski()
 
     def connect_kowalski(self):
@@ -421,7 +422,7 @@ class KowalskiCrossmatch():
                 "host": "kowalski.caltech.edu",
                 "protocol": "https",
                 "port": 443,
-                "username": "knolan", #TODO: add to credentials
+                "username": self.kowalski_username,
                 "password": self.kowalski_password,
                 "timeout": 6000
             },
@@ -430,7 +431,7 @@ class KowalskiCrossmatch():
                 "host": "gloria.caltech.edu",
                 "protocol": "https",
                 "port": 443,
-                "username": "knolan", # TODO
+                "username": self.kowalski_username,
                 "password": self.kowalski_password,
                 "timeout": 6000
             }
@@ -442,7 +443,7 @@ class KowalskiCrossmatch():
         with open(f'{self.path_data}/flare_data/dicts/events_dict_{self.observing_run}.json', 'r') as file:
             events_dict_add = json.load(file)
         do_crossmatch = [key for key, value in events_dict_add.items() if not value['crossmatch']]
-        log(f'{len(do_crossmatch)} events are missing crossmatch: {do_crossmatch}')
+        print(f'{len(do_crossmatch)} events are missing crossmatch: {do_crossmatch}')
         return do_crossmatch
 
     def load_skymap_to_kowalski(self, kowalski, localization_name, skymapstring, date, contour, machine):
@@ -471,7 +472,7 @@ class KowalskiCrossmatch():
         }
         response_catnorth_localization = kowalski.query(query=query)
         selected_agn = response_catnorth_localization.get('gloria', {}).get('data', [])
-        log(f'{len(selected_agn)} CATNorth AGN found in localization volume for {localization_name}')
+        print(f'{len(selected_agn)} CATNorth AGN found in localization volume for {localization_name}')
         return selected_agn
 
     def crossmatch_quaia(self, kowalski, localization_name, contour, date, zmin, zmax, mindec):    
@@ -494,7 +495,7 @@ class KowalskiCrossmatch():
         response_quaia_localization = kowalski.query(query=query, name='kowalski')
         selected_agn = response_quaia_localization.get('kowalski', {}).get('data', [])
         converted_selected_agn = [{**entry, '_id': str(entry['_id'])} for entry in selected_agn]
-        log(f'{len(converted_selected_agn)} Quaia AGN found in localization volume for {localization_name}')
+        print(f'{len(converted_selected_agn)} Quaia AGN found in localization volume for {localization_name}')
         return converted_selected_agn
 
     def delete_skymaps(self, kowalski, dateobs, localization_name, machine):
@@ -547,11 +548,11 @@ class KowalskiCrossmatch():
         ids_not_in_localization = set(ids_to_crossmatch) - set(localization_name)
         localization_not_in_ids = set(localization_name) - set(ids_to_crossmatch)
         if ids_not_in_localization:
-            log(f"these events need crossmatches but data were not provided: {ids_not_in_localization}")
+            print(f"these events need crossmatches but data were not provided: {ids_not_in_localization}")
             ids_to_crossmatch = [id for id in ids_to_crossmatch if id in localization_name]
         if localization_not_in_ids and crossmatch_new:
-            log(f"data for these events were provided, but they were skipped because only new crossmatches were performed: {localization_not_in_ids}")
-        log(f'Crossmatching {len(ids_to_crossmatch)} events: {ids_to_crossmatch}')
+            print(f"data for these events were provided, but they were skipped because only new crossmatches were performed: {localization_not_in_ids}")
+        print(f'Crossmatching {len(ids_to_crossmatch)} events: {ids_to_crossmatch}')
 
         # do crossmatch
         if 'catnorth' in self.catalogs:
@@ -576,7 +577,7 @@ class KowalskiCrossmatch():
             
         # save coords for catnorth crossmatch
         if not catnorth:
-            log('No catnorth crossmatch')
+            print('No catnorth crossmatch')
         else:
             # open saved crossmatch dict
             crossmatch_path=f'{self.path_data}/flare_data/dicts/crossmatch_dict_{self.observing_run}.gz'
@@ -590,9 +591,9 @@ class KowalskiCrossmatch():
             for key, value in crossmatch_dict.items():
                 crossmatch_dict_add[key] = value
                 if key not in crossmatch_dict_add:
-                    log(f'{key} added')
+                    print(f'{key} added')
                 else:
-                    log(f'{key} replaced previously saved crossmatch')
+                    print(f'{key} replaced previously saved crossmatch')
             if not self.testing:
                 with gzip.open(crossmatch_path, 'wb') as f:
                     f.write(pickle.dumps(crossmatch_dict_add))
@@ -607,7 +608,7 @@ class KowalskiCrossmatch():
                 if key in events_dict_add:
                     events_dict_add[key]['crossmatch'] = value
                 else:
-                    log(f'{key} not in dictionary')
+                    print(f'{key} not in dictionary')
             if not self.testing:
                 with open(f'{self.path_data}/flare_data/dicts/events_dict_{self.observing_run}.json', 'w') as file:
                     json.dump(events_dict_add, file)
@@ -647,6 +648,52 @@ class PushEventsPublic():
         plt.ylim(0, 0.2)
         plt.show()
 
+    # def push_changes_to_repo(self):
+    #     """
+    #     Push changes in the events_summary directory to the remote GitHub repository.
+    #     """
+    #     commit_message = 'automated push of new events'
+    #     try:
+    #         if not self.github_token:
+    #             raise ValueError("GitHub token is missing. Please provide a valid token.")
+            
+    #         remote_url = f'https://{self.github_token}@github.com/knolan10/BBHBot.git'
+    #         path_events_summary = f'{self.path_data}/events_summary'
+
+            
+    #         # Set the remote URL for the repository
+    #         subprocess.run(['git', '-C', repo_root, 'remote', 'set-url', 'origin', remote_url], check=True)
+            
+    #         # Stage changes in the events_summary directory
+    #         subprocess.run(['git', '-C', repo_root, 'add', path_events_summary], check=True)
+            
+    #         # Check the status of the repository, filtering for changes in events_summary
+    #         result = subprocess.run(['git', '-C', repo_root, 'status', '--porcelain'], capture_output=True, text=True)
+    #         changes = [line for line in result.stdout.splitlines() if line.startswith('A ') or line.startswith('M ') or line.startswith('D ')]
+    #         changes_in_summary = [line for line in changes if line.endswith(path_events_summary)]
+            
+    #         # Commit changes if there are any in the events_summary directory
+    #         if not changes_in_summary:
+    #             print("No changes to commit in the events_summary directory.")
+    #         else:
+    #             subprocess.run(['git', '-C', repo_root, 'commit', '-m', commit_message], check=True)
+                
+    #             # Check for new commits to push
+    #             push_check = subprocess.run(['git', '-C', repo_root, 'log', 'origin/main..HEAD'], capture_output=True, text=True)
+    #             if not push_check.stdout.strip():
+    #                 print("No new commits to push. Repository is up to date.")
+    #             else:
+    #                 # Push changes to the remote repository
+    #                 subprocess.run(['git', '-C', repo_root, 'push', 'origin', 'main'], check=True)
+    #                 print("Changes pushed to the repository successfully.")
+    #     except subprocess.CalledProcessError as e:
+    #         print(f"An error occurred while running a git command: {e}")
+    #     except ValueError as ve:
+    #         print(f"Error: {ve}")
+    #     except Exception as ex:
+    #         print(f"An unexpected error occurred: {ex}")
+
+
     def push_changes_to_repo(self):
         """
         Push changes in the events_summary directory to the remote GitHub repository.
@@ -657,41 +704,33 @@ class PushEventsPublic():
                 raise ValueError("GitHub token is missing. Please provide a valid token.")
             
             remote_url = f'https://{self.github_token}@github.com/knolan10/BBHBot.git'
-            # Resolve the repository root and events_summary path
-            repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'))
-            path_events_summary = os.path.abspath(os.path.join(repo_root, 'events_summary'))
-            
+            path_events_summary = f'{self.path_data}/events_summary'
+
             # Set the remote URL for the repository
-            subprocess.run(['git', '-C', repo_root, 'remote', 'set-url', 'origin', remote_url], check=True)
-            
+            subprocess.run(['git', 'remote', 'set-url', 'origin', remote_url], check=True)
+
             # Stage changes in the events_summary directory
-            subprocess.run(['git', '-C', repo_root, 'add', path_events_summary], check=True)
-            
-            # Check the status of the repository, filtering for changes in events_summary
-            result = subprocess.run(['git', '-C', repo_root, 'status', '--porcelain'], capture_output=True, text=True)
-            changes = [line for line in result.stdout.splitlines() if line.startswith('A ') or line.startswith('M ') or line.startswith('D ')]
-            changes_in_summary = [line for line in changes if line.endswith(path_events_summary)]
-            
-            # Commit changes if there are any in the events_summary directory
-            if not changes_in_summary:
-                log("No changes to commit in the events_summary directory.")
-            else:
-                subprocess.run(['git', '-C', repo_root, 'commit', '-m', commit_message], check=True)
-                
-                # Check for new commits to push
-                push_check = subprocess.run(['git', '-C', repo_root, 'log', 'origin/main..HEAD'], capture_output=True, text=True)
-                if not push_check.stdout.strip():
-                    log("No new commits to push. Repository is up to date.")
-                else:
-                    # Push changes to the remote repository
-                    subprocess.run(['git', '-C', repo_root, 'push', 'origin', 'main'], check=True)
-                    log("Changes pushed to the repository successfully.")
+            subprocess.run(['git', 'add', path_events_summary], check=True)
+
+            # Check for changes in the repository
+            result = subprocess.run(['git', 'status', '--porcelain'], capture_output=True, text=True)
+            if not result.stdout.strip():
+                print("No changes to commit in the events_summary directory.")
+                return
+
+            # Commit changes
+            subprocess.run(['git', 'commit', '-m', commit_message], check=True)
+
+            # Push changes to the remote repository
+            subprocess.run(['git', 'push', 'origin', 'main'], check=True)
+            print("Changes pushed to the repository successfully.")
+
         except subprocess.CalledProcessError as e:
-            log(f"An error occurred while running a git command: {e}")
+            print(f"An error occurred while running a git command: {e}")
         except ValueError as ve:
-            log(f"Error: {ve}")
+            print(f"Error: {ve}")
         except Exception as ex:
-            log(f"An unexpected error occurred: {ex}")
+            print(f"An unexpected error occurred: {ex}")
 
     def format_and_push(self):
         # get events from multiple runs (we present a single markdown file for trigger and error trigger)
@@ -745,7 +784,7 @@ class PushEventsPublic():
         low_area = df_priority[df_priority['90% Area (deg2)'] < 1000]
         highmass_lowarea = pd.merge(high_mass, low_area)  
         priority = pd.merge(highmass_lowarea, confident)
-        log(f'{len(priority)} {self.observing_run} events with FAR > 10 and mass > 60 and area < 1000 sq deg')
+        print(f'{len(priority)} {self.observing_run} events with FAR > 10 and mass > 60 and area < 1000 sq deg')
         # #manual edits
         priority.loc[priority['GW MJD'] == 60572, 'gcnids'] = '[2024-09-19T06:15:59](https://fritz.science/gcn_events/2024-09-19T06:15:59)'
         # #add comments
@@ -812,7 +851,7 @@ class PushEventsPublic():
             for file_path, content in files_to_write.items():
                 with open(file_path, 'w') as f:
                     f.write(content)
-            self.push_changes_to_repo(self.github_token)
+            self.push_changes_to_repo()
 
         return df, priority, trigger_df, error_triggers
 
@@ -837,7 +876,7 @@ class PlotSkymap():
         mocs = [k for k in list(event_files) if 'multiorder' in k]
         if not mocs:
             url = 'none'
-            log(self.gracedbid)
+            print(self.gracedbid)
         else:
             if any('LALInference' in item for item in mocs):
                 mocs = [k for k in mocs if 'LALInference' in k]
@@ -916,9 +955,9 @@ class VisualizePop():
                         color=color, edgecolor='black', label=f'{run}', align='edge')
                 stacked_heights += counts
             except FileNotFoundError:
-                log(f"File for runid {run} not found. Skipping.")
+                print(f"File for runid {run} not found. Skipping.")
             except Exception as e:
-                log(f"Error processing runid {run}: {e}. Skipping.")
+                print(f"Error processing runid {run}: {e}. Skipping.")
         plt.title('Significant BBH Mass Distribution', fontsize=20)
         plt.xlabel('Mass (M$_{\\odot}$)', fontsize=18)
         plt.ylabel('Count', fontsize=18)

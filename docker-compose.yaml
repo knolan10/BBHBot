@@ -3,11 +3,10 @@
 # that contains the triggered_events.csv file, keeping track of events we trigger ZTF on
 version: '3.7'
 
-
 services:
-  bbh_trigger:
+  bbhbot:
     build: .
-    image: bbh-trigger:latest
-    container_name: bbh_trigger
+    image: bbhbot:latest
+    container_name: bbhbot
     volumes:
       - ./data:/app/data

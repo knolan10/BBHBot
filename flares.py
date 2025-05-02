@@ -13,7 +13,7 @@ print(f"Starting FlareBot at {Time.now()}")
 with open('config/Credentials.yaml', 'r') as file:
     credentials = yaml.safe_load(file)
 testing = credentials['testing']
-path_to_data = credentials['path_to_data']
+path_data = credentials['path_data']
 observing_run = credentials['observing_run']
 zfps_email = credentials['zfps_email']
 zfps_userpass = credentials['zfps_userpass']
@@ -28,7 +28,7 @@ github_token= credentials['github_token']
 # Part 0 : load current photometry status
 print("------------------PART 0: Check status, try to submit queued requests------------------")
 do_photometry = True # this flag will be changed to false if we hit the 15000 request limit
-followup = PhotometryLog(path_to_data, email=zfps_email, userpass=zfps_userpass, auth_username=zfps_auth_username, auth_password=zfps_auth_password)
+followup = PhotometryLog(path_data, email=zfps_email, userpass=zfps_userpass, auth_username=zfps_auth_username, auth_password=zfps_auth_password)
 followup.check_completed_events() #if events are out of 200 day window, edit log so we stop checking them
 # action items :
 needs_photometry_request, waiting_for_photometry = followup.check_photometry_status()
@@ -43,7 +43,7 @@ time.sleep(30)
 # check for queued photometry requests (if we previously hit the 15000 limit)
 #if not testing and do_photometry:
 if do_photometry:
-    queued_photometry = PhotometryCoords.retrieve_queue_photometry(path_to_data)
+    queued_photometry = PhotometryCoords.retrieve_queue_photometry(path_data)
     if len(queued_photometry) > 0:
         print(f"Found {len(queued_photometry)} queued photometry requests")
         for x in queued_photometry:
@@ -82,7 +82,7 @@ if do_photometry:
                                         new_entry=new_zfps_entry)
                 number_pending_requests += submission[1]
                 # move the file of queued photometry into another "completed queued" directory - could periodically delete these
-                PhotometryCoords.move_complete_queued_photometry(file_name, path_to_data)
+                PhotometryCoords.move_complete_queued_photometry(file_name, path_data)
                 print(f"Completed queued photometry submission for {id}")
             else:
                 print(f"Error submitting queued photometry for {id}")
@@ -93,7 +93,7 @@ time.sleep(30)
 print("-------------------------------PART 1: Photometry Requests-------------------------------")
 
 #check gracedb for new events
-params = GetSuperevents(path_data=path_to_data, 
+params = GetSuperevents(path_data=path_data, 
                         event_source='gracedb',
                         observing_run=observing_run).get_new_events()
 print(f'found {len(params)} new events')
@@ -110,7 +110,8 @@ trigger_status = Fritz(eventid, dateid, a90, far, mass, allocation, fritz_token)
 #save the new events to dictionary
 df = NewEventsToDict(params, 
                     trigger_status, 
-                    path_to_data,
+                    path_data,
+                    observing_run,
                     testing).save_data()
 
 #get catnorth crossmatches
@@ -122,14 +123,14 @@ crossmatch = KowalskiCrossmatch(eventid,
                                 dateid, 
                                 zmin, 
                                 zmax, 
-                                path_to_data,
+                                path_data,
                                 testing=testing,
                                 kowalski_username=kowalski_username,
                                 kowalski_password=kowalski_password)
 matches = crossmatch.get_crossmatches()
 
 #compile all this info in events_summary directory
-df, priority, trigger_df, error_triggers = PushEventsPublic(path_to_data,
+df, priority, trigger_df, error_triggers = PushEventsPublic(path_data,
                                                             github_token,
                                                             observing_run=observing_run,
                                                             testing=testing).format_and_push()
@@ -171,7 +172,7 @@ for x in needs_photometry_request:
                                 graceid=id, 
                                 catalog='catnorth', 
                                 verbose=True,
-                                path_data=path_to_data,
+                                path_data=path_data,
                                 observing_run=observing_run)
     
     ra, dec, jd, number_agn = coords.get_photometry_coords()
@@ -241,7 +242,7 @@ for x in waiting_for_photometry:
     print(f"Now checking {num_batches} batches {action} request for event {id} on {date_submitted}")
     save_photometry = SavePhotometry(graceid=id, 
                                      action=action, 
-                                     path_data=path_to_data, 
+                                     path_data=path_data, 
                                      submission_date=date_submitted, 
                                      num_batches_submitted=num_batches,
                                      testing=testing, 
@@ -265,16 +266,16 @@ check_for_flares = list(set(check_for_flares))
 for id in check_for_flares:
     # check for flares (will overwrite previouse flare checks each time)
     AGN = FlarePreprocessing(graceid=id, 
-                            path_data=path_to_data, 
+                            path_data=path_data, 
                             observing_run=observing_run).process_for_flare()
     rolling_stats = RollingWindowStats(graceid=id, 
                             agn=AGN, 
-                            path_data=path_to_data,
+                            path_data=path_data,
                             observing_run=observing_run).get_rolling_window_stats()
     g, r, i, gr, gri = RollingWindowHeuristic(graceid=id, 
                                         agn=AGN, 
                                         rolling_stats=rolling_stats, 
-                                        path_data=path_to_data,
+                                        path_data=path_data,
                                         percent=0.6, 
                                         k_mad=3, 
                                         testing=testing,

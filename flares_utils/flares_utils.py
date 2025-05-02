@@ -8,7 +8,6 @@ import os
 from scipy import stats
 import math
 from astropy.time import Time
-from utils.log import log
 
 class FlarePreprocessing():
     def __init__(self, graceid, path_data, observing_run='O4c'):
@@ -78,7 +77,7 @@ class FlarePreprocessing():
         single_filter_r = [self.get_single_filter('ZTF_r', lc) for lc in df_with_mag]
         single_filter_i = [self.get_single_filter('ZTF_i', lc) for lc in df_with_mag]
         AGN = list(zip(single_filter_g, single_filter_r, single_filter_i, radec))
-        log(f'found {len(AGN)} AGN')
+        print(f'found {len(AGN)} AGN')
         return AGN
 
 
@@ -190,7 +189,7 @@ class RollingWindowHeuristic:
         index_i = [i for i in range(len(stats_i)) 
                 if not (np.isnan(stats_i[i][0]).all() or np.isnan(stats_i[i][1]).all() or np.isnan(stats_i[i][2]).all())
                 and sum(x > np.nanmin(stats_i[i][2]) for x in np.array(stats_i[i][0]) - self.k_mad * np.array(stats_i[i][1])) / len(stats_i[0]) > self.percent]
-        log(f'in g,r,i we find {len(index_g)},{len(index_r)},{len(index_i)} candidates')
+        print(f'in g,r,i we find {len(index_g)},{len(index_r)},{len(index_i)} candidates')
         return index_g, index_r, index_i
     
     def flares_across_filters(self, g,r,i):
@@ -198,9 +197,9 @@ class RollingWindowHeuristic:
         find detections in common between different colors
         """
         gr = np.intersect1d(g,r)
-        log(f'{len(gr)} AGN have flares in g and r filters')
+        print(f'{len(gr)} AGN have flares in g and r filters')
         gri = np.intersect1d(i,gr)
-        log(f'{len(gri)} AGN have flares in g, r, and i filters')
+        print(f'{len(gri)} AGN have flares in g, r, and i filters')
         return gr, gri
      
     def check_photometry_coverage(self):  
@@ -213,14 +212,14 @@ class RollingWindowHeuristic:
         #cut from consideration bc no baseline points
         no_baseline_points = [i for i in self.rolling_stats if is_all_nan(i[0][0]) and is_all_nan(i[1][0]) and is_all_nan(i[2][0])]
         number_no_baseline_points = len(no_baseline_points)
-        log(number_no_gw_points, '/', input, 'have no observations in any color in 200 day post GW period')
-        log(number_no_baseline_points, '/', input, 'have no observations in any color before the GW detection')
+        print(number_no_gw_points, '/', input, 'have no observations in any color in 200 day post GW period')
+        print(number_no_baseline_points, '/', input, 'have no observations in any color before the GW detection')
         return number_no_gw_points, number_no_baseline_points
     
     def get_flares(self):
         g,r,i = self.medians_test()
         unique_index = list(set(g+r+i))
-        log(f'{len(unique_index)} unique flares across all colors')
+        print(f'{len(unique_index)} unique flares across all colors')
         gr, gri = self.flares_across_filters(g,r,i)
         radec = [i[3] for i in self.agn]
         flare_coords_g = [radec[x] for x in g]
@@ -300,7 +299,7 @@ class Plotter:
                 common_values = set()  # Handle empty list of lists
             # Convert the result back to a list
             selected_flares = list(common_values)
-            log(f'{len(selected_flares)} AGN have flares in {flares_from_graceid} band(s)')
+            print(f'{len(selected_flares)} AGN have flares in {flares_from_graceid} band(s)')
             #get indices for these flares
             all_AGN_coords = [agn[3] for agn in self.agn]
             flare_indices = [i for i, value in enumerate(all_AGN_coords) if value in selected_flares]

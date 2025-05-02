@@ -28,8 +28,12 @@ MLP = pickle.load(open('utils/mlp_model.sav', 'rb'))
 
 if testing:
     configid = f'ztfmasstrigger{random.randint(0, 1000000)}'
+    topics=['gcn.classic.voevent.LVC_UPDATE']
 else:
     configid = 'ztfmasstrigger'
+    topics=['gcn.classic.voevent.LVC_PRELIMINARY',
+         'gcn.classic.voevent.LVC_INITIAL',
+         'gcn.classic.voevent.LVC_UPDATE']
 
 config = {'group.id': configid,
           'auto.offset.reset': 'earliest',
@@ -41,11 +45,9 @@ consumer = Consumer(config=config,
                     client_secret=credentials['client_secret'],
                     domain='gcn.nasa.gov')
 
-consumer.subscribe(['gcn.classic.voevent.LVC_PRELIMINARY',
-                    'gcn.classic.voevent.LVC_INITIAL',
-                    'gcn.classic.voevent.LVC_UPDATE'])
-
+consumer.subscribe(topics)
 log('subscribed to Kafka consumer')
+
 heartbeat_thread = threading.Thread(target=heartbeat)
 heartbeat_thread.daemon = True
 heartbeat_thread.start()
@@ -113,8 +115,8 @@ while True:
                 # find gcn event on fritz 
                 if not testing:
                     time.sleep(30)
-                end_time = time.time() + 300
-                if testing:
+                    end_time = time.time() + 300
+                else:
                     end_time = time.time() + 1  
                 gcnevent_id = None
                 while gcnevent_id is None and time.time() < end_time:
@@ -193,34 +195,37 @@ while True:
                         log(logmessage)
 
 
-                # check if ZTF survey naturaly covered the skymap previous nights
+                # check if ZTF survey naturally covered the skymap previous nights
                 #TODO NEED TO UPDATE THIS FUNCTION SO IT CHECKS NOT JUST FOR OBSERVATIONS BUT FOR SUFFICIENT % COVERAGE
                 startdate = (Time(dateobs) - TimeDelta(2, format='jd')).iso
                 observations = check_executed_observation(startdate, dateobs, gcnevent_id, fritz_token, mode)
                 if observations['data']['totalMatches'] >= 1:
                     logmessage=f'There is recent coverage of {superevent_id} - not triggering'
                     log(logmessage)
-                    raise MyException(logmessage)
-                
-                if testing:
-                    logmessage=f'Plan for {superevent_id} is good - but dont trigger in testing mode'
-                    log(logmessage)
-                    raise MyException(logmessage)
-                
-                # send plan to ZTF queue
-                trigger_ztf(observation_plan_request_id, fritz_token, mode)
-                log(f'Triggered ZTF for {superevent_id} at {Time.now()}')
+                    serendipitious_observation=(observation_plan_request_id, start_observation)
+                    message = f'Skipped ZTF triggered for {superevent_id} due to serendipitous coverage'
+                else:
+                    if testing:
+                        logmessage=f'Plan for {superevent_id} is good - but dont trigger in testing mode'
+                        log(logmessage)
+                    else:
+                        # send plan to ZTF queue
+                        trigger_ztf(observation_plan_request_id, fritz_token, mode)
+                        log(f'Triggered ZTF for {superevent_id} at {Time.now()}')
+                    message = f'ZTF Triggered for {superevent_id}'
+                    serendipitious_observation=None
                 
                 #write to triggered_events.csv
                 trigger_cadence = generate_cadence_dates(dateobs)
                 gcn_type = (alert_type, skymap_name)
                 queued_plan = (observation_plan_request_id, start_observation)
                 valid = True
-                add_triggercsv(superevent_id, dateobs, gcn_type, gcnevent_id, localization_id, queued_plan, trigger_cadence, valid, path_data)         
-                message = f'ZTF Triggered for {superevent_id}'
+                if serendipitious_observation:
+                    queued_plan=None
+                add_triggercsv(superevent_id, dateobs, gcn_type, gcnevent_id, localization_id, trigger_cadence, queued_plan, serendipitious_observation, valid, path_data)         
                 send_trigger_email(credentials, message, dateobs)
 
-                log(f'post-trigger sleep')
+                log('post-trigger sleep')
                 time.sleep(120) # after triggering pause to avoid double triggers on quickly updated gcn
         
             

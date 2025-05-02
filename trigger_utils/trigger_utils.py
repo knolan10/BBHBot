@@ -18,6 +18,7 @@ import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from sklearn.neural_network import MLPRegressor
+#TODO use either datetime or astropytime
 
 class MyException(Exception):
     pass
@@ -237,36 +238,24 @@ def get_plan_stats(gcnevent_id, queuename, token, mode):
         return None
 
 
-def get_kowalski_ztf_queue(token, allocation):
-    """
-    check current items in the ZTF observing queue
-    """
-    headers = {'Authorization': f'token {token}'}
-    endpoint = f'https://fritz.science/api/observation/external_api/{allocation}?queuesOnly=true'
-    response = requests.request('GET', endpoint, headers=headers)
-    if response.status_code != 200:   
-        raise Exception(f'API call to ZTF queue failed')         
-    json_string = response.content.decode('utf-8')
-    json_data = json.loads(json_string)
-    return json_data
-
-def query_kowalski_ztf_queue(keywords, token, allocation):
-    """
-    check current items in the ZTF observing queue and wordsearch for keywords from our event
-    """
-    headers = {'Authorization': f'token {token}'}
-    endpoint = f'https://fritz.science/api/observation/external_api/{allocation}?queuesOnly=true'
-    response = requests.request('GET', endpoint, headers=headers)
-    if response.status_code != 200:   
-        raise Exception(f'API call to ZTF queue failed')         
-    json_string = response.content.decode('utf-8')
-    json_data = json.loads(json_string)
-    queue_names = json_data['data']['queue_names']
-    for name in queue_names:
-        for keyword in keywords:
-            if keyword in name:
-                return 'Already Submitted'
-    return None
+# def query_kowalski_ztf_queue(keywords, token, allocation):
+#     """
+#     check current items in the ZTF observing queue and wordsearch for keywords from our event
+#     """
+#     headers = {'Authorization': f'token {token}'}
+#     endpoint = f'https://fritz.science/api/observation/external_api/{allocation}?queuesOnly=true'
+#     response = requests.request('GET', endpoint, headers=headers)
+#     if response.status_code != 200:   
+#         raise Exception(f'API call to ZTF queue failed')         
+#     json_string = response.content.decode('utf-8')
+#     json_data = json.loads(json_string)
+#     queue_names = json_data['data']['queue_names']
+#     for name in queue_names:
+#         for keyword in keywords:
+#             if keyword in name:
+#                 return 'Already Submitted'
+#             else:
+#                 return None
 
 def trigger_ztf(plan_request_id, token, mode):
     """
@@ -314,6 +303,10 @@ def check_executed_observation(startdate, enddate, gcnid, token, mode):
     return response.json()
 
 
+# CREDIT: https://github.com/desy-multimessenger/nuztf/blob/main/nuztf/skymap_scanner.py
+
+
+
 """
 Bookkeeping
 """
@@ -334,6 +327,25 @@ def check_triggered_csv(superevent_id, path_data):
         trigger_plan_id = None
     return triggered, trigger_plan_id
 
+def add_triggercsv(superevent_id, dateobs, gcn_type, gcnid, localizationid, trigger_cadence, queued_plan, serendipitous_observation, valid, path_data):
+    # Create a DataFrame with the new event data
+    new_event = pd.DataFrame([{
+        'superevent_id': superevent_id,
+        'dateobs': dateobs,
+        'gcn_type': gcn_type,
+        'gcn_id': gcnid,
+        'localization_id': localizationid,
+        'trigger_cadence': str(trigger_cadence),
+        'pending_observation': queued_plan,
+        'unsuccessful_observation': None,
+        'successful_observation': None,
+        'serendipitous_observation': serendipitous_observation,
+        'valid': valid
+    }])
+
+    # Append the new event to the existing CSV file
+    new_event.to_csv(f'{path_data}/trigger_data/triggered_events.csv', mode='a', header=False, index=False)
+
 def update_trigger_log(superevent_id_to_check, column, value, path_data, append_string=False, remove_string=False):
     df = pd.read_csv(f'{path_data}/trigger_data/triggered_events.csv')
     if append_string:
@@ -352,26 +364,7 @@ def update_trigger_log(superevent_id_to_check, column, value, path_data, append_
         df.loc[df['superevent_id'] == superevent_id_to_check, column] = new_value
     else:
         df.loc[df['superevent_id'] == superevent_id_to_check, column] = value
-    df.to_csv('./data/triggered_events.csv', index=False)
-
-def add_triggercsv(superevent_id, dateobs, gcn_type, gcnid, localizationid, queued_plan, trigger_cadence, valid, path_data):
-    # Create a DataFrame with the new event data
-    new_event = pd.DataFrame([{
-        'superevent_id': superevent_id,
-        'dateobs': dateobs,
-        'gcn_type': gcn_type,
-        'gcn_id': gcnid,
-        'localization_id': localizationid,
-        'trigger_cadence': str(trigger_cadence),
-        'pending_observation': queued_plan,
-        'unsuccessful_observation': None,
-        'successful_observation': None,
-        'valid': valid
-    }])
-
-    # Append the new event to the existing CSV file
-    new_event.to_csv(f'{path_data}/trigger_data/triggered_events.csv', mode='a', header=False, index=False)
-
+    df.to_csv(f'{path_data}/trigger_data/triggered_events.csv', index=False)
 
 def send_email(sender_email, sender_password, recipient_emails, subject, body):
     smtp_server = 'smtp.gmail.com'

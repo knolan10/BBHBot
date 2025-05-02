@@ -10,3 +10,4 @@ dev/data/
 flares_utils/__pycache__
 trigger_utils/__pycache__
 trigger_utils/__pycache__/trigger_utils.cpython-312.pyc
+utils/__pycache__/log.cpython-312.pyc

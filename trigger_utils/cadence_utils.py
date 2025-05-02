@@ -2,7 +2,6 @@ import numpy as np
 import pandas as pd
 from astropy.time import Time, TimeDelta
 from trigger_utils import update_trigger_log, check_executed_observation, send_trigger_email
-from utils.log import log
 
 class MyException(Exception):
     pass
@@ -25,15 +24,13 @@ def check_pending_observations(df):
             (int(item.split(",")[0].strip("()")), item.split(",")[1].strip("()"))
             for item in items
         ]
-        logmessage = f'Found {len(items_list)} pending observation for {supereventid}'
-        log(logmessage)
+        print(f'Found {len(items_list)} pending observation for {supereventid}')
         current_date = Time.now()
         for item in items_list:
             observation_plan_id, start_observation = item[0], item[1]
             #if it is before the time for observation, don't do anything yet
             if current_date < Time(start_observation):
-                logmessage= f'Observation of {supereventid} scheduled for {start_observation} - will check tomorrow'
-                log(logmessage)
+                print(f'Observation of {supereventid} scheduled for {start_observation} - will check tomorrow')
                 continue
             # if the current date is within 2 days after start_observation, check if we observed
             time_difference = abs((current_date - Time(start_observation)).jd)
@@ -41,8 +38,7 @@ def check_pending_observations(df):
                 gcnid = row.gcn_id 
                 localizationid = row.localization_id
                 dateobs = row.dateobs
-                logmessage = f'will check status of pending observation for {supereventid} on {start_observation}'
-                log(logmessage)
+                print(f'will check status of pending observation for {supereventid} on {start_observation}')
                 format_item = f"({item[0]},{item[1]})"
                 check_pending.append([True, supereventid, format_item, gcnid, localizationid, observation_plan_id, dateobs])
             else:
@@ -75,11 +71,10 @@ def parse_pending_observation(path_data, fritz_token, mode):
                     # ~2 days post trigger and still unsuccessful - handle manually
                     update_trigger_log(superevent_id, 'unsuccessful_observation', observation_info, append_string=True)
                     update_trigger_log(superevent_id, 'pending_observation', observation_info, remove_string=True)
-                    logmessage = f'We did not sucessfully observe the queued plans for {superevent_id}'
-                    log(logmessage)
+                    print(f'We did not sucessfully observe the queued plans for {superevent_id}')
                     continue
                 enddate = (Time(dateobs) + TimeDelta(3, format='jd')).iso
-                # TODO: this isn't correct but completely replacing so not bothering to fix
+                # TODO: replace check_executed_observation
                 observations = check_executed_observation(dateobs, enddate, gcnid, fritz_token, mode)
                 if observations['data']['totalMatches'] >= 1:
                     print(f'Observation of {superevent_id} successful')  
@@ -125,6 +120,5 @@ def trigger_on_cadence(path_data):
                 localizationid = row.localization_id
                 dateobs = row.dateobs
                 trigger.append(['followup', supereventid, gcnid, localizationid, dateobs]) 
-                logmessage = f"Found follow-up trigger: {supereventid} on {cadence_date}"
-                log(logmessage)
+                print(f"Found follow-up trigger: {supereventid} on {cadence_date}")
     return trigger  
