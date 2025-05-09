@@ -1,8 +1,8 @@
 {
     "summary_stats": {
-        "total_requests": 30566,
-        "total_currently_pending": 12426,
-        "total_saved": 17736
+        "total_requests": 72001,
+        "total_currently_pending": 10885,
+        "total_saved": 39964
     },
     "events": {
         "S250319bu": {
@@ -48,10 +48,45 @@
                     "action": "update",
                     "num_agn_submitted": 12426,
                     "num_batches_submitted": 10,
+                    "batch_ids": "['12090' '12091' '12092' '12093' '12094' '12095' '12096' '12097' '12098'\n '12099']",
+                    "number_returned": 12273,
+                    "number_broken_urls": 153,
+                    "complete": true
+                },
+                {
+                    "catalog": "catnorth",
+                    "submission_date": "2025-05-05 17:08:16.807",
+                    "action": "update",
+                    "num_agn_submitted": 11454,
+                    "num_batches_submitted": 8,
+                    "batch_ids": "['12112' '12113' '12114' '12115' '12116' '12117' '12118' '12119']",
+                    "number_returned": 9955,
+                    "number_broken_urls": 1499,
+                    "complete": true,
+                    "from_queue": true
+                },
+                {
+                    "catalog": "catnorth",
+                    "submission_date": "2025-05-08 19:17:16.859",
+                    "action": "update",
+                    "num_agn_submitted": 8211,
+                    "num_batches_submitted": 10,
                     "batch_ids": null,
                     "number_returned": null,
                     "number_broken_urls": null,
                     "complete": false
+                },
+                {
+                    "catalog": "catnorth",
+                    "submission_date": "2025-05-09 17:54:03.807",
+                    "action": "update",
+                    "num_agn_submitted": 10885,
+                    "num_batches_submitted": 8,
+                    "batch_ids": null,
+                    "number_returned": null,
+                    "number_broken_urls": null,
+                    "complete": false,
+                    "from_queue": true
                 }
             ]
         }

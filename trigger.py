@@ -26,6 +26,7 @@ else:
 
 MLP = pickle.load(open('utils/mlp_model.sav', 'rb'))
 
+# settings to subscribe to the Kafka topics
 if testing:
     configid = f'ztfmasstrigger{random.randint(0, 1000000)}'
     topics=['gcn.classic.voevent.LVC_UPDATE']
@@ -46,7 +47,7 @@ consumer = Consumer(config=config,
                     domain='gcn.nasa.gov')
 
 consumer.subscribe(topics)
-log('subscribed to Kafka consumer')
+log(f'subscribed to Kafka consumer with groupid {configid} and topics {topics}')
 
 heartbeat_thread = threading.Thread(target=heartbeat)
 heartbeat_thread.daemon = True
@@ -56,6 +57,7 @@ while True:
     try:
         for message in consumer.consume(timeout=1.0):
             if message.value() is None:
+                print('No message received')
                 continue
             try:
                 value = message.value()
@@ -156,7 +158,14 @@ while True:
                     previous_trigger = True
                 else:
                     previous_trigger = False
-                    
+
+                # if another group has triggered on the event, we will not trigger
+                if previous_trigger and not triggered: 
+                    logmessage = f'Previous trigger for {superevent_id}'
+                    log(logmessage)
+                    raise MyException(logmessage)
+                
+                # do the plan stats pass our criteria
                 total_time = fritz_event_status[1]
                 probability = fritz_event_status[2]
                 start_observation = fritz_event_status[3]
@@ -171,17 +180,13 @@ while True:
                     log(logmessage)
                     raise MyException(logmessage)
                             
+                # don't trigger on events older than 1 day
                 if Time.now().mjd - mjd > 1:
-                    # don't trigger on events older than 1 day
                     logmessage = f'{superevent_id} is more than 1 day old'
                     log(logmessage)
                     raise MyException(logmessage)
-
-                if previous_trigger:
-                    logmessage = f'Previous trigger for {superevent_id}'
-                    log(logmessage)
-                    raise MyException(logmessage)
                 
+                # if we have triggered on earlier GCN, can we update trigger with more recent inference
                 if triggered:
                     if not check_before_sunset():
                         logmessage = f'Too late to update submitted trigger for {superevent_id}'
@@ -193,7 +198,6 @@ while True:
                         delete_trigger_ztf(trigger_plan_id, fritz_token, mode)
                         logmessage = f'Removing previous trigger for {superevent_id} so we can resubmit updated plan'
                         log(logmessage)
-
 
                 # check if ZTF survey naturally covered the skymap previous nights
                 #TODO NEED TO UPDATE THIS FUNCTION SO IT CHECKS NOT JUST FOR OBSERVATIONS BUT FOR SUFFICIENT % COVERAGE

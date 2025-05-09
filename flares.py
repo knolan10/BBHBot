@@ -34,7 +34,6 @@ followup.check_completed_events() #if events are out of 200 day window, edit log
 needs_photometry_request, waiting_for_photometry = followup.check_photometry_status()
 
 number_pending_requests = followup.check_num_pending_zfps()
-print(f'{number_pending_requests} pending requests')
 if number_pending_requests > 15000: # ZFPS limit
     do_photometry = False
 
@@ -57,12 +56,19 @@ if do_photometry:
                 print(f'Not submitting queued request for {id} - still too many pending')
                 break
             print(f"Submitting {number_to_submit} queued photometry coords for event {id}")
-            submission = GetPhotometry(ra=ra,
-                    dec=dec,
-                    jd=jd,
-                    graceid=id,
-                    observing_run=observing_run,
-                    testing=testing).submit()
+            
+            submission = GetPhotometry(ra,
+                dec,
+                jd,
+                id,
+                zfps_auth_username, 
+                zfps_auth_password,
+                zfps_email, 
+                zfps_userpass,
+                observing_run=observing_run,
+                path_data=path_data,    
+                testing=testing).submit()
+
             if submission:
                 new_zfps_entry = {
                     "catalog": "catnorth",
@@ -187,17 +193,18 @@ for x in needs_photometry_request:
         print(f"Not submitting {action} photometry request for event {id} - too many pending requests")
         do_photometry = False
         continue
-        
+    
     submission = GetPhotometry(ra,
-                dec,
-                jd,
-                id,
-                zfps_auth_username, 
-                zfps_auth_password,
-                zfps_email, 
-                zfps_userpass,
-                observing_run=observing_run,
-                testing=testing).submit()
+                               dec,
+                               jd,
+                               id,
+                               zfps_auth_username,
+                               zfps_auth_password,
+                               zfps_email, 
+                               zfps_userpass,
+                               observing_run=observing_run,
+                               path_data=path_data,
+                               testing=testing).submit()
 
     new_zfps_entry = {
             "catalog": "catnorth",

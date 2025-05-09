@@ -315,7 +315,7 @@ class PhotometryCoords():
 
 
 class GetPhotometry():
-    def __init__(self, ra, dec, jd, graceid, auth_username, auth_password, email, userpass, observing_run='O4c', path_data=None, testing=True):
+    def __init__(self, ra, dec, jd, graceid, auth_username, auth_password, email, userpass, observing_run='O4c', path_data='data', testing=True):
         self.ra=ra
         self.dec=dec
         self.jd=jd
@@ -684,6 +684,10 @@ class PhotometryLog():
                 num_pending= full_table.shape[0]
             print(f"Number of pending requests: {num_pending}")
             return num_pending
+        elif r.status_code == 400: # unfortunately returns this error code when there are 0 pending jobs, so assume this is the case
+            print("No pending jobs")
+            num_pending=0
+            return num_pending
         else:
             print(f"Error: {r.status_code}")
             return None
@@ -741,8 +745,8 @@ class PhotometryLog():
                     waiting_for_photometry.append([id, x['submission_date'], x['num_batches_submitted'], x['action']])
             # find events that need update photometry request based on our cadence (loosely based on followup TOO schedule)
             num_zfps_requests_so_far = len([x for x in self.photometry_pipeline['events'][id]['zfps'] if "from_queue" not in x])
-            time_delta_thresholds = [9, 20, 30, 50, 100]
-            num_requests_should_be_made = [2, 3, 4, 5, 6] # ie after 9 days, we should have 2 requests (the initial and a first update)
+            time_delta_thresholds = [9, 16, 23, 30, 52, 100]
+            num_requests_should_be_made = [2, 3, 4, 5, 6, 7] # ie after 9 days, we should have 2 requests (the initial and a first update)
             if any(time_delta >= t and num_zfps_requests_so_far < z for t, z in zip(time_delta_thresholds, num_requests_should_be_made)):
                 needs_photometry_request.append([id, dateobs, 'update'])
         print(f'Waiting for photometry: {[x[0] for x in waiting_for_photometry]}')

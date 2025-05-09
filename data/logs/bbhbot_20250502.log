@@ -1,0 +1,8 @@
+20250502_21:07:56: Starting TriggerBot with testing = True
+20250502_21:07:56: subscribed to Kafka consumer
+20250502_21:07:56: heartbeat
+20250502_21:08:56: heartbeat
+20250502_21:10:20: Starting TriggerBot with testing = True
+20250502_21:10:20: subscribed to Kafka consumer with groupid ztfmasstrigger135572 and topics ['gcn.classic.voevent.LVC_UPDATE']
+20250502_21:10:20: heartbeat
+20250502_21:11:20: heartbeat

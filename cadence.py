@@ -20,7 +20,6 @@ else:
     fritz_token = credentials['fritz_token']
     allocation = credentials['allocation']
 
-
 # look at any pending observations and determine whether we were successful in observing, if within 2 days automatically retry
 retry = parse_pending_observation(path_data, fritz_token, mode)
 print(f'retry: {retry}')

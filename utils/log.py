@@ -2,7 +2,7 @@ import datetime
 import time
 import os
 
-LOG_DIR = "../data/logs"
+LOG_DIR = "data/logs"
 verbose = True
 
 def time_stamp():

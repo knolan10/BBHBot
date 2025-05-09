@@ -237,25 +237,24 @@ def get_plan_stats(gcnevent_id, queuename, token, mode):
         print(f'error: {e}')
         return None
 
-
-# def query_kowalski_ztf_queue(keywords, token, allocation):
-#     """
-#     check current items in the ZTF observing queue and wordsearch for keywords from our event
-#     """
-#     headers = {'Authorization': f'token {token}'}
-#     endpoint = f'https://fritz.science/api/observation/external_api/{allocation}?queuesOnly=true'
-#     response = requests.request('GET', endpoint, headers=headers)
-#     if response.status_code != 200:   
-#         raise Exception(f'API call to ZTF queue failed')         
-#     json_string = response.content.decode('utf-8')
-#     json_data = json.loads(json_string)
-#     queue_names = json_data['data']['queue_names']
-#     for name in queue_names:
-#         for keyword in keywords:
-#             if keyword in name:
-#                 return 'Already Submitted'
-#             else:
-#                 return None
+def query_kowalski_ztf_queue(keywords, token, allocation):
+    """
+    check current items in the ZTF observing queue and wordsearch for keywords from our event
+    """
+    headers = {'Authorization': f'token {token}'}
+    endpoint = f'https://fritz.science/api/observation/external_api/{allocation}?queuesOnly=true'
+    response = requests.request('GET', endpoint, headers=headers)
+    if response.status_code != 200:   
+        raise Exception(f'API call to ZTF queue failed')         
+    json_string = response.content.decode('utf-8')
+    json_data = json.loads(json_string)
+    queue_names = json_data['data']['queue_names']
+    for name in queue_names:
+        for keyword in keywords:
+            if keyword in name:
+                return 'Already Submitted'
+            else:
+                return None
 
 def trigger_ztf(plan_request_id, token, mode):
     """
@@ -355,7 +354,8 @@ def update_trigger_log(superevent_id_to_check, column, value, path_data, append_
             current_value = ''
             separator = ''
         df['superevent_id'] = df['superevent_id'].astype('object')
-        df.loc[df['superevent_id'] == superevent_id_to_check, column] = current_value+separator+value
+        df[column] = df[column].astype('object')
+        df.loc[df['superevent_id'] == superevent_id_to_check, column] = current_value + separator + value
     elif remove_string:
         current_value = df.loc[df['superevent_id'] == superevent_id_to_check, column].values[0]
         if type(current_value)!= str:

@@ -1,44 +1,41 @@
 # Cadence
 
-- [Introduction](#introduction)
-- [In Depth Description](#in-depth-description)
-- [Technical Points](#technical-points)
-- [Credentials](#credentials)
+- [Overview](#Overview)
+- [Step by step description](#Step-by-step-description)
+- [More details](#More-details)
 
-## Introduction
-This is the code, currently being tested, to handle the followup of the intitial ZTF trigger descriped in [Trigger_documentation](./Trigger_documentation.md). This includes excution of additional triggers over the following 50 days, and retriggering in cases where we failed to observe.
+## Overview
+This is the code which submits additional triggers to ensure optimal and standardized coverage of priority events over the 50 days post GW detection, and also handle resubmitting triggers in cases where we fail to observe.
 
-## In Depth Description
-The steps executed in [cadence](./cadence.py) go as follows:
+## Step by step description
+The steps executed in [cadence](../cadence.py) go as follows:
 
-Rather than running continuously, this script is automated to run once per day at 12PM.
+This script uses cron to run once per day at 1PM.
 
-1. Check if we submitting anything for obervation the previous night.
+1. Find all pending triggers, whether they are from the initial trigger or a followup cadence trigger. Check whether we were successful in observing. If we were successful, we will update our logs. If we were not, we will automatically resubmit the trigger if it is within 2 days (otherwise, will need to be handled manually).
 
-    - When we submit an automated request for observation (an initial TOO for a new event or a subsequent TOO for an event we have triggered), we add that event to the "pending" column of [triggered_events](./data/triggered_events.csv), so we just check if there are any events there.
+2. Find any events that need a followup trigger, ie for each event does todays date match any date in a list of dates generated with the cadence 7, 14, 21, 28, 40, and 50 days. Note - this is suceptible to missing followup triggers if the script doesn't run on a particular day, so should be closely monitored in it's current version.
 
-    - For each pending observation, we check whether there were successful observations the previous night. If there were, we move the event into the "successful_observation" column. If there weren't but the event is fewer than two days old, we will request a plan for the upcoming night. If there weren't and the event is older than two days, we send an email notification and move the event into the "unsuccessful_observation" column.
-
-    - We then check the "trigger_cadence" column entries, which are lists of dates 7, 14, 21, 28, 40, and 50 days after the gravitational wave detections. If the current date matches any of these dates, then we will request a plan for the upcoming night.
-
-2. If we have found any unsucessful observations or prescheduled cadence observations to request an observing plan for, we do so here.
+3. If we have found any unsucessful observations or prescheduled cadence observations to retrigger on, do so.
 
     - We use the same methods as in the initial trigger script. We request Fritz to generate an observing plan using Gwemopt. If the plan can cover probability > 0.5 in time < 5400 s, we add this plan to the ZTF queue.
 
-    - If we submit for observation, we add the event to the "pending" column if necessary and send an email notification.
+    - If we submit for observation, we add the event to the "pending" column of [triggered_events](../data/trigger_data/triggered_events.csv) and send an email notification.
 
-## Technical Points
+
+## More details
 - There is a "testing" bool set in the `trigger_credentials` file. If set to True, this will use the preview.fritz API, will prevent observation requests being actually sent to ZTF, and will not include all of the pauses built in designed to ensure smooth processing of real-time events.
 
-## Credentials
+- [triggered_events](../data/trigger_data/triggered_events.csv) is an important file that both the [trigger](../trigger.py) and [cadence](../cadence.py) scripts interact with. When a new event passes all criteria for a trigger, [trigger](../trigger.py) will add a new row for that event. Then, [cadence](../cadence.py) will edit that row as it checks whether triggers were successful and requests followup triggers. The columns in this file are: 
 
-### Required to Run
-- **Fritz**: 
-  - `fritz_token`
-- **Email Notice of Triggers**: 
-  - `sender_email`
-  - `sender_password`
-  - `recipient_emails`
-
-### Testing Mode
-- `preview_fritz_token`
+    - superevent_id: the GraceDB assigned id
+    - dateobs: the date of observation, which Fritz uses as an ID
+    - gcn_type: preliminary, initial, update
+    - gcn_id: Fritz assigned ID for the specific GCN
+    - localization_id: Fritz assigned ID for the localization
+    - trigger_cadence: the list of dates that followup triggers should happen on
+    - pending_observation: recently submitted triggers that have not yet been confirmed as successful. Saved as (observation_plan_id, observation_plan_start_date)
+    - unsuccessful_observation: unsuccessful pending moved to this column
+    - successful_observation: successful pending moved to this column
+    - serendipitous_observation: log any time we skip a trigger due to serendipitious coverage.
+    - valid: True or False, set to False if event should not be considered anymore
