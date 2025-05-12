@@ -59,6 +59,7 @@ followup = PhotometryLog(
 followup.check_completed_events()  # if events are out of 200 day window, edit log so we stop checking them
 # action items :
 needs_photometry_request, waiting_for_photometry = followup.check_photometry_status()
+needs_photometry_request = []
 
 number_pending_requests = followup.check_num_pending_zfps()
 if number_pending_requests > 15000:  # ZFPS limit

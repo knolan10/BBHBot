@@ -34,25 +34,29 @@ Process all of the pending requests and requests to be submitted identified abov
 
 2. Find any new events that have BBHBot triggers. For these events, request 2 year baselines of forced photometry for all crossmatched AGN that we have no locally saved photometry for. We store all the forced photometry light curves as dataframes locally in the data directory, although we do not push these to github.
 
-3. Add any events needing baseline forced photometry to all events in Part 0 which we have determined need updated photometry (ie get photometry up to the current time). We then submit these forced photometry requests and log them in [photometry_pipeline.json](../data/flare_data/photometry_pipeline.json) (described more below).
+3. Compile all photometry requests which should be made: any events needing baseline forced photometry and all events in Part 0 which we have determined need updated photometry (ie get photometry up to the current date). We then submit these forced photometry requests and log them in [photometry_pipeline.json](../data/flare_data/photometry_pipeline.json) (described more below).
 
 ### PART 2: Retrieve Photometry
 
-After the first update phometry request is made 9 days after the GW detection, each following day the script will check for the completed photometry. We also wait to save the baseline photometry request until 9 days in, as these tend to be larger requests (in terms of time coverage) that take longer to return, and we won't do any flare identification until we have post GW photometry anyways.
+Save completed ZFPS requests.
 
-If part of a request (ie some but not all batches) return, we will wait to save the results until all the batches return.
+1. After the first update phometry request is made 9 days after the GW detection, each following day the script will check for the completed photometry.
 
-Updated photometry is appended to the locally saved baselines for given AGN.
+   - We also wait to save the baseline photometry request until 9 days in, as these tend to be larger requests (in terms of time coverage) that take longer to return, and we won't do any flare identification until we have post GW photometry anyways.
 
-For any events that we successfully save photometry, we will save to a list to analyze in Part 3 below.
+   - If part of a request (ie some but not all batches) return, we will wait to save the results until all the batches return.
+
+2. Updated photometry is appended to the locally saved baselines for given AGN.
+
+3. For any events that we successfully save photometry, we will save to a list to analyze in Part 3 below.
 
 ### PART 3: Flare identification
 
 Take all events with updated photometry from part 2, and run heuristic for anomalous flares.
 
-The heuristic uses statistics calculated on a rolling window. It calculates medians and median absolute deviations for 50 day windows over a 2 year baseline, and 25 day windows up to 200 days post gravitational wave detection. It saves the coordinates of lightcurves in g, r, and i for which the brightest median in the post GW windows is brighter than 3 times the median absolute deviation of 60% of baseline medians. This heuristic was determined with simulated data.
+1. The heuristic uses statistics calculated on a rolling window. It calculates medians and median absolute deviations for 50 day windows over a 2 year baseline, and 25 day windows up to 200 days post gravitational wave detection. It saves the coordinates of lightcurves in g, r, and i for which the brightest median in the post GW windows is brighter than 3 times the median absolute deviation of 60% of baseline medians. This heuristic was determined with simulated data.
 
-Every time this runs, we overwrite the flare results in the given event file in the directory [flares](../data/flare_data/flares/)
+2. Every time this runs, we overwrite the flare results in the given event file in the directory [flares](../data/flare_data/flares/)
 
 ## More details
 
