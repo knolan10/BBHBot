@@ -5,6 +5,7 @@ import os
 LOG_DIR = "data/logs"
 verbose = True
 
+
 def time_stamp():
     """
 
@@ -26,8 +27,8 @@ def log(message):
         logfile.write(f"{timestamp}: {message}\n")
         logfile.flush()
 
+
 def heartbeat():
     while True:
-        log('heartbeat')
+        log("heartbeat")
         time.sleep(60)
-

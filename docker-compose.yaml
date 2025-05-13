@@ -1,7 +1,7 @@
 # this docker compose yaml should create a container from the Dockerfile in the same directory
 # we want to have a persistent volume that binds to the ./data directory here
 # that contains the triggered_events.csv file, keeping track of events we trigger ZTF on
-version: '3.7'
+version: "3.7"
 
 services:
   bbhbot:
