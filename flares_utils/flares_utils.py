@@ -8,13 +8,20 @@ import os
 from scipy import stats
 import math
 from astropy.time import Time
+import glob
+from matplotlib import rcParams
+
+rcParams["font.family"] = "Liberation Serif"
 
 
 class FlarePreprocessing:
-    def __init__(self, graceid, path_data, observing_run="O4c"):
+    def __init__(
+        self, graceid, path_data=None, custom_path_photometry=None, observing_run="O4c"
+    ):
         self.graceid = graceid
         self.path_data = path_data
         self.path_photometry = f"{path_data}/flare_data/ZFPS/"
+        self.custom_path_photometry = custom_path_photometry
         self.observing_run = observing_run
 
     def load_event_lightcurves(self):
@@ -107,6 +114,7 @@ class RollingWindowStats:
         window_size_after=25,
         baseline_years=2,
         observing_run="O4c",
+        dateobs=None,
     ):
         self.graceid = graceid
         self.agn = agn
@@ -115,13 +123,16 @@ class RollingWindowStats:
         self.window_size_after = window_size_after
         self.baseline_years = baseline_years
         self.observing_run = observing_run
+        self.dateobs = dateobs
 
         # open the stored event info
-        with open(
-            f"{path_data}/flare_data/dicts/events_dict_{self.observing_run}.json", "r"
-        ) as file:
-            events_dict = json.load(file)
-        self.dateobs = events_dict[self.graceid]["gw"]["GW MJD"] + 2400000.5
+        if not self.dateobs:
+            with open(
+                f"{self.path_data}/flare_data/dicts/events_dict_{self.observing_run}.json",
+                "r",
+            ) as file:
+                events_dict = json.load(file)
+            self.dateobs = events_dict[self.graceid]["gw"]["GW MJD"] + 2400000.5
 
     def calculate_meds_mads(self, df):
         """
@@ -623,3 +634,91 @@ class Plotter:
                     print(i)
         else:
             print("Invalid index to plot")
+
+
+class LightcurveProcessorOriginal:
+    """
+    Old version of the lightcurve processor
+    use for LITD lightcurves which have not been preprocessed and arent stored like the O4 lightcurves
+    """
+
+    def __init__(self, photometry_path, jds, ids):
+        self.photometry_path = photometry_path
+        self.jds = jds
+        self.ids = ids
+
+    def loadlc(self):
+        filenames = glob.glob(self.photometry_path + "/*.txt")
+        df_list = [
+            pd.read_csv(filename, sep=r"\s+", comment="#") for filename in filenames
+        ]
+        for df in df_list:
+            df.columns = df.columns.str.replace(",", "")
+        return df_list
+
+    def quality_filter(self, df):
+        """
+        recommended quality filtering
+        """
+        df_qf = df[
+            (df["infobitssci"] < 33554432)
+            & (df["scisigpix"] < 25)
+            & (df["sciinpseeing"] < 4)
+            & (df["forcediffimflux"] > -99998)
+        ]
+        return df_qf
+
+    def get_total_fluxes(self, df):
+        """
+        see zfps sect. 6.5
+        """
+        df2 = df[df["dnearestrefsrc"] < 1]
+        nearestrefflux = 10 ** (0.4 * (df2["zpdiff"] - df2["nearestrefmag"]))
+        nearestreffluxunc = df2["nearestrefmagunc"] * nearestrefflux / 1.085
+        Flux_tot = df2["forcediffimflux"] + nearestrefflux
+        Fluxunc_tot = np.sqrt(
+            df2["forcediffimfluxunc"] ** 2 + nearestreffluxunc**2
+        )  # add variances (conservative estimate)
+        SNR_tot = Flux_tot / Fluxunc_tot
+        df2.insert(0, "SNR_tot", SNR_tot, False)
+        df2.insert(0, "Flux_tot", Flux_tot, False)
+        df2.insert(0, "Fluxunc_tot", Fluxunc_tot, False)
+        return df2
+
+    def get_calibrated_mags(self, df):
+        SNT = 3  # Signal-to-Noise Threshold (for declaring significant detection)
+        SNU = 5  # Signal-to-Noise Upper Limit (for assigning upper limit)
+        # We have a "confident" detection; compute mag with error bar:
+        df_conf = df[df["SNR_tot"] > SNT]
+        mag = df_conf["zpdiff"] - 2.5 * np.log10(df_conf["Flux_tot"])
+        sigma_mag = 1.0857 / df_conf["SNR_tot"]
+        df_conf.insert(0, "mag", mag, False)
+        df_conf.insert(0, "sigma_mag", sigma_mag, False)
+        # calculate upper limit
+        df_lim = df[df["SNR_tot"] < SNT]
+        mag_lim = df_lim["zpdiff"] - 2.5 * np.log10(SNU * df_lim["Fluxunc_tot"])
+        df_lim.insert(0, "mag_lim", mag_lim, False)
+        return df_conf, df_lim
+
+    def get_single_filter(self, filter, df):
+        """
+        break each df into g, r, i
+        """
+        df_sf = df[df["filter"] == filter]
+        return df_sf
+
+    def process_lightcurves(self):
+        """
+        combine all of the above functions
+        """
+        photometry = self.loadlc()
+        batch_photometry_filtered = [self.quality_filter(lc) for lc in photometry]
+        df_with_SNR = [self.get_total_fluxes(lc) for lc in batch_photometry_filtered]
+        df_with_mag = [self.get_calibrated_mags(lc)[0] for lc in df_with_SNR]
+        single_filter_g = [self.get_single_filter("ZTF_g", lc) for lc in df_with_mag]
+        single_filter_r = [self.get_single_filter("ZTF_r", lc) for lc in df_with_mag]
+        single_filter_i = [self.get_single_filter("ZTF_i", lc) for lc in df_with_mag]
+        AGN = list(
+            zip(single_filter_g, single_filter_r, single_filter_i, self.jds, self.ids)
+        )
+        return AGN

@@ -669,9 +669,10 @@ class SavePhotometry:
         )
 
         # find the coords from our submission date (just check close enough bc there are time zone differences)
+        # TODO: this can break if requests are made close together for same event, which should not happen
         submission_date_astropy = Time(self.submission_date)
 
-        def is_within_24_hours(date_str):
+        def is_within_hours(date_str):
             date_astropy = Time(date_str)
             time_difference = abs(
                 (date_astropy - submission_date_astropy).to("hour").value
@@ -679,7 +680,7 @@ class SavePhotometry:
             return time_difference <= 24
 
         filtered_table["matches_date"] = filtered_table["created"].apply(
-            is_within_24_hours
+            is_within_hours
         )
         filtered_table = filtered_table[filtered_table["matches_date"]]
         filtered_table = filtered_table.drop(columns=["matches_date"])
@@ -704,7 +705,7 @@ class SavePhotometry:
         if num_batches_received != self.num_batches_submitted:
             return None
 
-        # need to do this because there is a slight difference between the coords submitted and those returned usually
+        # need to do this because there is a slight difference between the number of coords submitted and those returned usually
         ra = filtered_table["ra"].tolist()
         dec = filtered_table["dec"].tolist()
         name = [str(r) + "_" + str(d) for r, d in zip(ra, dec)]

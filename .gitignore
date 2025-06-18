@@ -6,6 +6,9 @@ data/flare_data/completed_queued_photometry
 data/flare_data/ZFPS
 
 dev/data/
+dev/flare_simulations/
+dev/ligo_inference_drift.ipynb
+dev/alerts_vs_catalogs.ipynb
 
 flares_utils/__pycache__
 trigger_utils/__pycache__

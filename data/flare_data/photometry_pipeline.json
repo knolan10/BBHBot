@@ -1,8 +1,8 @@
 {
   "summary_stats": {
-    "total_requests": 72001,
+    "total_requests": 95881,
     "total_currently_pending": 0,
-    "total_saved": 50849
+    "total_saved": 92405
   },
   "events": {
     "S250319bu": {
@@ -71,10 +71,10 @@
           "action": "update",
           "num_agn_submitted": 8211,
           "num_batches_submitted": 10,
-          "batch_ids": null,
-          "number_returned": null,
-          "number_broken_urls": null,
-          "complete": false
+          "batch_ids": "['12128' '12129' '12130' '12131' '12132' '12133' '12134']",
+          "number_returned": 7500,
+          "number_broken_urls": 2,
+          "complete": true
         },
         {
           "catalog": "catnorth",
@@ -84,6 +84,29 @@
           "num_batches_submitted": 8,
           "batch_ids": "['12137' '12138' '12139' '12140' '12141' '12142' '12143' '12144']",
           "number_returned": 10885,
+          "number_broken_urls": 0,
+          "complete": true,
+          "from_queue": true
+        },
+        {
+          "catalog": "catnorth",
+          "submission_date": "2025-05-19 17:53:09.128",
+          "action": "update",
+          "num_agn_submitted": 11209,
+          "num_batches_submitted": 7,
+          "batch_ids": "['12188' '12189' '12190' '12191' '12192' '12193' '12194']",
+          "number_returned": 10500,
+          "number_broken_urls": 0,
+          "complete": true
+        },
+        {
+          "catalog": "catnorth",
+          "submission_date": "2025-05-27 17:26:58.383",
+          "action": "update",
+          "num_agn_submitted": 12671,
+          "num_batches_submitted": 9,
+          "batch_ids": "['12220' '12221' '12222' '12223' '12224' '12225' '12226' '12227' '12228']",
+          "number_returned": 12671,
           "number_broken_urls": 0,
           "complete": true,
           "from_queue": true

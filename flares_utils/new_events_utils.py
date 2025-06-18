@@ -23,6 +23,9 @@ import ligo.skymap.plot
 import ligo.skymap.postprocess
 from ligo.gracedb.rest import GraceDb
 from penquins import Kowalski
+from matplotlib import rcParams
+
+rcParams["font.family"] = "Liberation Serif"
 
 g = GraceDb()
 
@@ -937,6 +940,7 @@ class PushEventsPublic:
         self.testing = testing
 
     def plot_trigger_timeline(self):
+        # Load and preprocess the data
         trigger_df = pd.read_csv(
             f"{self.path_data}/events_summary/trigger.md",
             delimiter="|",
@@ -959,34 +963,93 @@ class PushEventsPublic:
             "comments",
         ]
         trigger_df["GW MJD"] = trigger_df["GW MJD"].str.strip().astype(int)
+        dates = Time(trigger_df["GW MJD"], format="mjd").datetime
+        trigger_df["GW Date"] = [date.strftime("%Y-%m-%d") for date in dates]
         trigger_df["Mass (M_sol)"] = trigger_df["Mass (M_sol)"].str.strip().astype(int)
-        # trigger_df['GW ISO'] = Time(trigger_df['GW MJD'], format='mjd').iso
-        # trigger_df['GW ISO'] = trigger_df['GW ISO'].str.split('T').str[0]
-        plt.figure(figsize=(18, 2))
-        plt.scatter(
-            trigger_df["GW MJD"],
-            [0.1] * len(trigger_df),
-            s=trigger_df["Mass (M_sol)"] * 10,
-            alpha=0.5,
+
+        # Split the data into two subsets
+        cutoff_date = Time("2025-02-01", format="iso").mjd
+        df_before_cutoff = trigger_df[trigger_df["GW MJD"] <= cutoff_date]
+        df_after_cutoff = trigger_df[trigger_df["GW MJD"] > cutoff_date]
+
+        # Calculate subplot width fractions
+        total_points = len(trigger_df)
+        fraction_before = len(df_before_cutoff) / total_points
+        fraction_after = len(df_after_cutoff) / total_points
+
+        # Create subplots with proportional widths
+        fig, (ax1, ax2) = plt.subplots(
+            1,
+            2,
+            gridspec_kw={"width_ratios": [fraction_before, fraction_after]},
+            figsize=(11, 3),
         )
-        plt.xlabel("Date (MJD)", fontsize=18)
-        plt.yticks([])
-        plt.title("Timeline of Triggered Observations", fontsize=20)
-        for i, row in trigger_df.iterrows():
-            plt.annotate(
+
+        # Plot points for O4b
+
+        ax1.scatter(
+            df_before_cutoff["GW MJD"],
+            [0.1] * len(df_before_cutoff),
+            s=df_before_cutoff["Mass (M_sol)"] * 10,
+            alpha=0.2,
+            edgecolors="darkblue",
+            linewidth=1,
+        )
+        ax1.set_xlabel("Date", fontsize=18)
+        ax1.set_yticks([])
+        ax1.set_title("LIGO O4b", fontsize=16)
+        ax1.set_xticks(df_before_cutoff["GW MJD"])
+        ax1.set_xticklabels(
+            df_before_cutoff["GW Date"], rotation=45, ha="right", fontsize=12
+        )
+        ax1.spines["top"].set_visible(False)
+        ax1.spines["right"].set_visible(False)
+        ax1.spines["left"].set_visible(False)
+        ax1.spines["bottom"].set_position("zero")
+        ax1.set_ylim(0, 0.2)
+        ax1.tick_params(axis="x", rotation=30)
+
+        for i, row in df_before_cutoff.iterrows():
+            ax1.annotate(
                 f"{row['Mass (M_sol)']}M$_{{\\odot}}$",
-                (row["GW MJD"], 0.078),
+                (row["GW MJD"], 0.1),
                 textcoords="offset points",
-                xytext=(0, 10),
+                xytext=(0, -5),
                 ha="center",
             )
-        ax = plt.gca()
-        ax.spines["top"].set_visible(False)
-        ax.spines["right"].set_visible(False)
-        ax.spines["left"].set_visible(False)
-        ax.spines["bottom"].set_position("zero")
-        plt.xticks(fontsize=14)
-        plt.ylim(0, 0.2)
+
+        # Plot points for O4c
+        ax2.scatter(
+            df_after_cutoff["GW MJD"],
+            [0.1] * len(df_after_cutoff),
+            s=df_after_cutoff["Mass (M_sol)"] * 10,
+            alpha=0.2,
+            edgecolors="darkblue",
+            linewidth=1,
+        )
+        ax2.set_yticks([])
+        ax2.set_title("O4c", fontsize=16)
+        ax2.set_xticks(df_after_cutoff["GW MJD"])
+        ax2.set_xticklabels(
+            df_after_cutoff["GW Date"], rotation=45, ha="right", fontsize=12
+        )
+        ax2.spines["top"].set_visible(False)
+        ax2.spines["right"].set_visible(False)
+        ax2.spines["left"].set_visible(False)
+        ax2.spines["bottom"].set_position("zero")
+        ax2.set_ylim(0, 0.2)
+        ax2.tick_params(axis="x", rotation=30)
+
+        for i, row in df_after_cutoff.iterrows():
+            ax2.annotate(
+                f"{row['Mass (M_sol)']}M$_{{\\odot}}$",
+                (row["GW MJD"], 0.1),
+                textcoords="offset points",
+                xytext=(0, -5),
+                ha="center",
+            )
+        plt.suptitle("Timeline of Triggered Observations", fontsize=20)
+        plt.tight_layout()
         plt.show()
 
     def push_changes_to_repo(self):
