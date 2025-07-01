@@ -58,7 +58,7 @@ else:
     ]
 
 config = {
-    "group.id": configid,
+    "group.id": credentials["configid"],
     "auto.offset.reset": "earliest",
     "enable.auto.commit": False,
     "max.poll.interval.ms": 600050,

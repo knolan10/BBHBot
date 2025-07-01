@@ -378,7 +378,7 @@ class RollingWindowHeuristic:
             "flare_coords_r": flare_coords_r,
             "flare_coords_i": flare_coords_i,
         }
-        directory = f"{self.path_data}/flares"
+        directory = f"{self.path_data}/flare_data/flares"
         if not self.testing:
             os.makedirs(directory, exist_ok=True)
             path = f"{directory}/{self.graceid}.json"

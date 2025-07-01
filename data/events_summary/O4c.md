@@ -1,5 +1,8 @@
 | graceids                                                          | GW MJD | 90% Area (deg2) | 50% Area (deg2) | Distance (Gpc) | FAR (years/FA) | Mass (M_sol) | trigger       | comments |
 | :---------------------------------------------------------------- | -----: | --------------: | --------------: | -------------: | -------------: | -----------: | :------------ | :------- |
+| [S250629bs](https://gracedb.ligo.org/superevents/S250629bs/view/) |  60856 |            2998 |             908 |           4.85 |            0.7 |          102 | not triggered |          |
+| [S250628am](https://gracedb.ligo.org/superevents/S250628am/view/) |  60855 |             287 |              65 |            0.9 |            900 |           34 | not triggered |          |
+| [S250629ae](https://gracedb.ligo.org/superevents/S250629ae/view/) |  60855 |            2833 |             804 |           7.08 |              1 |          146 | not triggered |          |
 | [S250331o](https://gracedb.ligo.org/superevents/S250331o/view/)   |  60765 |              18 |               5 |           0.66 |            100 |           30 | not triggered |          |
 | [S250328ae](https://gracedb.ligo.org/superevents/S250328ae/view/) |  60762 |              14 |               3 |           0.51 |            100 |           24 | not triggered |          |
 | [S250326y](https://gracedb.ligo.org/superevents/S250326y/view/)   |  60760 |            1460 |             380 |           5.41 |           5400 |          190 | not triggered |          |
