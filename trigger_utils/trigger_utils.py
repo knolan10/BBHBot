@@ -17,6 +17,7 @@ import xmltodict
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from ligo.gracedb.rest import GraceDb
 # TODO use either datetime or astropytime
 
 
@@ -148,6 +149,43 @@ def m_total_mlp(MLP_model, dl_bbh, far, dl_bns=168.0):
     X = X.reshape(1, -1)
     mass = MLP_model.predict(X)[0]
     return 10.0**mass
+
+
+def query_mchirp_gracedb(event):
+    """
+    Fetches chirp mass .json from GraceDB
+    """
+    client = GraceDb(service_url="https://gracedb.ligo.org/api/")
+
+    files = client.files(event).json()
+
+    for fname in files:
+        if "mchirp_source" in fname and fname.endswith(".json"):
+            print(f"Found: {fname}")
+            file_data = client.files(event, fname)
+            with open("mchirp_source.json", "wb") as f:
+                f.write(file_data.read())
+            break
+
+    with open("mchirp_source.json", "r") as f:
+        data = json.load(f)
+
+    # FIXME find max bin here or in trigger.py? Do we want the .json files saved for any purpose?
+    # FIXME do we want to cut on events with 50% prob above 22
+    max_index = data["probabilities"].index(max(data["probabilities"]))
+    bin_edges = data["bin_edges"]
+
+    # FIXME likely remove prints once implemented
+    print(f"Max probability index: {max_index}")
+    print(f"Bin edges: {bin_edges[max_index]} to {bin_edges[max_index+1]}")
+
+    if bin_edges[max_index] >= 22:
+        print("Most probable bin is ≥ 22")
+    else:
+        print("Most probable bin is < 22")
+
+    # FIXME What do we want to return? True/False? Max bin?
+    return
 
 
 """
