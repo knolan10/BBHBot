@@ -1,7 +1,7 @@
 {
   "summary_stats": {
     "total_requests": 119761,
-    "total_currently_pending": 12671,
+    "total_currently_pending": 0,
     "total_saved": 92405
   },
   "events": {

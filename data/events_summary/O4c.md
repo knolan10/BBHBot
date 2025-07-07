@@ -1,8 +1,10 @@
 | graceids                                                          | GW MJD | 90% Area (deg2) | 50% Area (deg2) | Distance (Gpc) | FAR (years/FA) | Mass (M_sol) | trigger       | comments |
 | :---------------------------------------------------------------- | -----: | --------------: | --------------: | -------------: | -------------: | -----------: | :------------ | :------- |
+| [S250705cb](https://gracedb.ligo.org/superevents/S250705cb/view/) |  60862 |             510 |             150 |           1.21 |           33.3 |           48 | not triggered |          |
+| [S250704ab](https://gracedb.ligo.org/superevents/S250704ab/view/) |  60860 |              77 |               8 |           0.54 |            100 |           25 | not triggered |          |
 | [S250702n](https://gracedb.ligo.org/superevents/S250702n/view/)   |  60859 |            1944 |             753 |            2.1 |            1.8 |           57 | not triggered |          |
-| [S250701bq](https://gracedb.ligo.org/superevents/S250701bq/view/) |  60858 |           24219 |            8061 |           0.56 |            560 |           22 | not triggered |          |
 | [S250701bp](https://gracedb.ligo.org/superevents/S250701bp/view/) |  60858 |           24219 |            8061 |           0.96 |            960 |           36 | not triggered |          |
+| [S250701bq](https://gracedb.ligo.org/superevents/S250701bq/view/) |  60858 |           24219 |            8061 |           0.56 |            560 |           22 | not triggered |          |
 | [S250629bs](https://gracedb.ligo.org/superevents/S250629bs/view/) |  60856 |            2998 |             908 |           4.85 |            0.7 |          102 | not triggered |          |
 | [S250628am](https://gracedb.ligo.org/superevents/S250628am/view/) |  60855 |             287 |              65 |            0.9 |            900 |           34 | not triggered |          |
 | [S250629ae](https://gracedb.ligo.org/superevents/S250629ae/view/) |  60855 |            2833 |             804 |           7.08 |              1 |          146 | not triggered |          |
