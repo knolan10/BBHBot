@@ -12,7 +12,7 @@ from trigger_utils.trigger_utils import (
     check_executed_observation,
     query_fritz_gcn_events,
     query_kowalski_ztf_queue,
-    query_gracedb_mchirp,
+    query_mchirp_gracedb,
     m_total_mlp,
     generate_cadence_dates,
     submit_plan,
@@ -26,6 +26,7 @@ from trigger_utils.trigger_utils import (
     MyException,
 )
 from utils.log import log, heartbeat
+from ligo.gracedb.exceptions import HTTPError
 
 with open("config/Credentials.yaml", "r") as file:
     credentials = yaml.safe_load(file)
@@ -133,10 +134,33 @@ while True:
 
                 log(f"Processing {superevent_id} from {alert_type} alert")
 
-                # FIXME here I assume we return True/False
-                # FIXME could try/except query_gracedb_mchirp into m_total_mlp if there is not an mchirp file (there should be)
-                # FIXME there should be an mchirp file for all significant events
-                if not query_gracedb_mchirp(superevent_id):
+                end_time = time.time() + 300
+                mchirp = None
+                while mchirp is None and time.time() < end_time:
+                    try:
+                        # grab the left bin edge for the most probable mchirp bin
+                        mchirp = query_mchirp_gracedb(superevent_id)
+                    except HTTPError:
+                        time.sleep(30)
+                if mchirp is None:
+                    logmessage = (
+                    f"Could not find a chirp mass file on GraceDB for {superevent_id}"
+                    )
+                    log(logmessage)
+                    mass = m_total_mlp(MLP, distmean, far, dl_bns=168.0)
+                    if mass < 60:
+                        if triggered:
+                            update_trigger_log(
+                                superevent_id, "valid", False, path_data=path_data
+                            )
+                            delete_trigger_ztf(trigger_plan_id, fritz_token, mode)
+                            log(f"attempting to remove trigger for {superevent_id}")
+                        logmessage = f"{superevent_id} did not pass mass criteria"
+                        log(logmessage)
+                        raise MyException(logmessage)
+
+                # trigger on most probable bins >= 22
+                if mchirp < 22:
                     if triggered:
                         update_trigger_log(
                             superevent_id, "valid", False, path_data=path_data

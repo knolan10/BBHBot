@@ -170,22 +170,11 @@ def query_mchirp_gracedb(event):
     with open("mchirp_source.json", "r") as f:
         data = json.load(f)
 
-    # FIXME find max bin here or in trigger.py? Do we want the .json files saved for any purpose?
-    # FIXME do we want to cut on events with 50% prob above 22
     max_index = data["probabilities"].index(max(data["probabilities"]))
     bin_edges = data["bin_edges"]
 
-    # FIXME likely remove prints once implemented
-    print(f"Max probability index: {max_index}")
-    print(f"Bin edges: {bin_edges[max_index]} to {bin_edges[max_index+1]}")
-
-    if bin_edges[max_index] >= 22:
-        print("Most probable bin is ≥ 22")
-    else:
-        print("Most probable bin is < 22")
-
-    # FIXME What do we want to return? True/False? Max bin?
-    return
+    # return the left edge of the most probable bin
+    return bin_edges[max_index]
 
 
 """
