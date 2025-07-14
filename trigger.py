@@ -171,18 +171,6 @@ while True:
                     log(logmessage)
                     raise MyException(logmessage)
 
-                mass = m_total_mlp(MLP, distmean, far, dl_bns=168.0)
-                if mass < 60:
-                    if triggered:
-                        update_trigger_log(
-                            superevent_id, "valid", False, path_data=path_data
-                        )
-                        delete_trigger_ztf(trigger_plan_id, fritz_token, mode)
-                        log(f"attempting to remove trigger for {superevent_id}")
-                    logmessage = f"{superevent_id} did not pass mass criteria"
-                    log(logmessage)
-                    raise MyException(logmessage)
-
                 log(f"{superevent_id} passed mass criteria")
 
                 # find gcn event on fritz
