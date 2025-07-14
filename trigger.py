@@ -134,7 +134,7 @@ while True:
 
                 log(f"Processing {superevent_id} from {alert_type} alert")
 
-                end_time = time.time() + 300
+                end_time = time.time() + 600
                 mchirp = None
                 while mchirp is None and time.time() < end_time:
                     try:
@@ -153,7 +153,7 @@ while True:
                             raise MyException(logmessage)
 
                     except HTTPError:
-                        time.sleep(30)
+                        time.sleep(60)
                 if mchirp is None:
                     logmessage = (
                     f"Could not find a chirp mass file on GraceDB for {superevent_id}"
