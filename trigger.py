@@ -140,6 +140,18 @@ while True:
                     try:
                         # grab the left bin edge for the most probable mchirp bin
                         mchirp = query_mchirp_gracedb(superevent_id)
+                        # trigger on most probable bins >= 22
+                        if mchirp < 22:
+                            if triggered:
+                                update_trigger_log(
+                                    superevent_id, "valid", False, path_data=path_data
+                                )
+                                delete_trigger_ztf(trigger_plan_id, fritz_token, mode)
+                                log(f"attempting to remove trigger for {superevent_id}")
+                            logmessage = f"{superevent_id} did not pass mass criteria"
+                            log(logmessage)
+                            raise MyException(logmessage)
+
                     except HTTPError:
                         time.sleep(30)
                 if mchirp is None:
@@ -158,18 +170,6 @@ while True:
                         logmessage = f"{superevent_id} did not pass mass criteria"
                         log(logmessage)
                         raise MyException(logmessage)
-
-                # trigger on most probable bins >= 22
-                if mchirp < 22:
-                    if triggered:
-                        update_trigger_log(
-                            superevent_id, "valid", False, path_data=path_data
-                        )
-                        delete_trigger_ztf(trigger_plan_id, fritz_token, mode)
-                        log(f"attempting to remove trigger for {superevent_id}")
-                    logmessage = f"{superevent_id} did not pass mass criteria"
-                    log(logmessage)
-                    raise MyException(logmessage)
 
                 log(f"{superevent_id} passed mass criteria")
 
