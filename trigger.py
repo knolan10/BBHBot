@@ -141,7 +141,7 @@ while True:
                         # grab the left bin edge for the most probable mchirp bin
                         mchirp = query_mchirp_gracedb(superevent_id)
                         # trigger on most probable bins >= 22
-                        if mchirp < 22:
+                        if mchirp and mchirp < 22:
                             if triggered:
                                 update_trigger_log(
                                     superevent_id, "valid", False, path_data=path_data
@@ -153,7 +153,12 @@ while True:
                             raise MyException(logmessage)
 
                     except HTTPError:
-                        time.sleep(60)
+                        logmessage = (
+                            f"GraceDB HTTPError for {superevent_id}, retrying in 60 seconds"
+                        )
+                        log(logmessage)
+                    
+                    time.sleep(60)
                 if mchirp is None:
                     logmessage = (
                     f"Could not find a chirp mass file on GraceDB for {superevent_id}"

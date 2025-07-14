@@ -166,6 +166,9 @@ def query_mchirp_gracedb(event):
             with open("mchirp_source.json", "wb") as f:
                 f.write(file_data.read())
             break
+        else:
+            print(f"Did not find chirp mass file on Gracedb event page for {event}")
+            return None
 
     with open("mchirp_source.json", "r") as f:
         data = json.load(f)
