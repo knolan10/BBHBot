@@ -17,6 +17,7 @@ import xmltodict
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from ligo.gracedb.rest import GraceDb
 # TODO use either datetime or astropytime
 
 
@@ -148,6 +149,35 @@ def m_total_mlp(MLP_model, dl_bbh, far, dl_bns=168.0):
     X = X.reshape(1, -1)
     mass = MLP_model.predict(X)[0]
     return 10.0**mass
+
+
+def query_mchirp_gracedb(event):
+    """
+    Fetches chirp mass .json from GraceDB
+    """
+    client = GraceDb(service_url="https://gracedb.ligo.org/api/")
+
+    files = client.files(event).json()
+
+    for fname in files:
+        if "mchirp_source" in fname and fname.endswith(".json"):
+            print(f"Found: {fname}")
+            file_data = client.files(event, fname)
+            with open("mchirp_source.json", "wb") as f:
+                f.write(file_data.read())
+            break
+        else:
+            print(f"Did not find chirp mass file on Gracedb event page for {event}")
+            return None
+
+    with open("mchirp_source.json", "r") as f:
+        data = json.load(f)
+
+    max_index = data["probabilities"].index(max(data["probabilities"]))
+    bin_edges = data["bin_edges"]
+
+    # return the left edge of the most probable bin
+    return bin_edges[max_index]
 
 
 """

@@ -12,6 +12,7 @@ from trigger_utils.trigger_utils import (
     check_executed_observation,
     query_fritz_gcn_events,
     query_kowalski_ztf_queue,
+    query_mchirp_gracedb,
     m_total_mlp,
     generate_cadence_dates,
     submit_plan,
@@ -25,6 +26,7 @@ from trigger_utils.trigger_utils import (
     MyException,
 )
 from utils.log import log, heartbeat
+from ligo.gracedb.exceptions import HTTPError
 
 with open("config/Credentials.yaml", "r") as file:
     credentials = yaml.safe_load(file)
@@ -78,6 +80,7 @@ heartbeat_thread = threading.Thread(target=heartbeat)
 heartbeat_thread.daemon = True
 heartbeat_thread.start()
 
+# FIXME one initial thought with this, will this be pinging GraceDB repeatedly, could consider saving the file
 while True:
     try:
         for message in consumer.consume(timeout=1.0):
@@ -131,17 +134,47 @@ while True:
 
                 log(f"Processing {superevent_id} from {alert_type} alert")
 
-                mass = m_total_mlp(MLP, distmean, far, dl_bns=168.0)
-                if mass < 60:
-                    if triggered:
-                        update_trigger_log(
-                            superevent_id, "valid", False, path_data=path_data
+                end_time = time.time() + 600
+                mchirp = None
+                while mchirp is None and time.time() < end_time:
+                    try:
+                        # grab the left bin edge for the most probable mchirp bin
+                        mchirp = query_mchirp_gracedb(superevent_id)
+                        # trigger on most probable bins >= 22
+                        if mchirp and mchirp < 22:
+                            if triggered:
+                                update_trigger_log(
+                                    superevent_id, "valid", False, path_data=path_data
+                                )
+                                delete_trigger_ztf(trigger_plan_id, fritz_token, mode)
+                                log(f"attempting to remove trigger for {superevent_id}")
+                            logmessage = f"{superevent_id} did not pass mass criteria"
+                            log(logmessage)
+                            raise MyException(logmessage)
+
+                    except HTTPError:
+                        logmessage = (
+                            f"GraceDB HTTPError for {superevent_id}, retrying in 60 seconds"
                         )
-                        delete_trigger_ztf(trigger_plan_id, fritz_token, mode)
-                        log(f"attempting to remove trigger for {superevent_id}")
-                    logmessage = f"{superevent_id} did not pass mass criteria"
+                        log(logmessage)
+                    
+                    time.sleep(60)
+                if mchirp is None:
+                    logmessage = (
+                    f"Could not find a chirp mass file on GraceDB for {superevent_id}"
+                    )
                     log(logmessage)
-                    raise MyException(logmessage)
+                    mass = m_total_mlp(MLP, distmean, far, dl_bns=168.0)
+                    if mass < 60:
+                        if triggered:
+                            update_trigger_log(
+                                superevent_id, "valid", False, path_data=path_data
+                            )
+                            delete_trigger_ztf(trigger_plan_id, fritz_token, mode)
+                            log(f"attempting to remove trigger for {superevent_id}")
+                        logmessage = f"{superevent_id} did not pass mass criteria"
+                        log(logmessage)
+                        raise MyException(logmessage)
 
                 log(f"{superevent_id} passed mass criteria")
 
