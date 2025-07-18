@@ -34,7 +34,7 @@ class PhotometryStatus:
             print("observing_run must be O4a, O4b, or O4c")
             print(e)
             return
-        # TODO: automate
+        # TODO: automate.. add trigger key to events_dict
         trigger_list = [
             "S240919bn",
             "S240923ct",
@@ -466,7 +466,7 @@ class GetPhotometry:
         ra = json.dumps(ra)
         dec = json.dumps(dec)
         jdstart = json.dumps(jd)
-        jdend = json.dumps(Time.now().jd)
+        jdend = json.dumps(round(Time.now().jd))
         payload = {
             "ra": ra,
             "dec": dec,
@@ -687,12 +687,19 @@ class SavePhotometry:
         print(f"{len(filtered_table)} coords found")
 
         # check if we retrieved the same number of batches as submitted, if not, likely not complete yet
-        # TODO: this will break when batch codes are > 5 digits
+        # this breaks for codes>6digits
         def extract_batch_code(lightcurve):
-            match = re.search(r"/(\d{5})/", lightcurve)
-            if match:
-                return match.group(1)
-            return None
+            try:
+                match = re.search(r"/(\d{5})/", lightcurve)
+                if match:
+                    return match.group(1)
+                match = re.search(r"/(\d{6})/", lightcurve)
+                if match:
+                    return match.group(1)
+                return None
+            except MyException as e:
+                print(f"Error: {e}")
+                return None
 
         filtered_table["batch_code"] = filtered_table["lightcurve"].apply(
             extract_batch_code
@@ -992,8 +999,12 @@ class PhotometryLog:
         """
         if event_id not in self.photometry_pipeline["events"]:
             self.photometry_pipeline["events"][event_id] = event_data
+            print(event_data)
             try:
-                num_agn = event_data["zfps"]["num_agn_submitted"]
+                if isinstance(event_data["zfps"], str):
+                    num_agn = 0
+                else:
+                    num_agn = event_data["zfps"]["num_agn_submitted"]
             except KeyError:
                 num_agn = 0
             self.update_summary_stats(

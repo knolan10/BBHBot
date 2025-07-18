@@ -1,140 +1,140 @@
 {
-  "summary_stats": {
-    "total_requests": 119761,
-    "total_currently_pending": 0,
-    "total_saved": 92405
-  },
-  "events": {
-    "S250319bu": {
-      "dateobs": "2025-03-19T13:52:26Z",
-      "over_200_days": false,
-      "zfps": [
-        {
-          "catalog": "catnorth",
-          "submission_date": "2025-04-02 20:41:31.218",
-          "action": "new",
-          "num_agn_submitted": 15000,
-          "num_batches_submitted": 10,
-          "batch_ids": "['12010' '12011' '12012' '12013' '12014' '12015' '12016' '12017' '12018' '12019']",
-          "number_returned": 14608,
-          "number_broken_urls": 370,
-          "complete": true
-        },
-        {
-          "catalog": "catnorth",
-          "submission_date": "2025-04-11 23:01:30.994",
-          "action": "new",
-          "num_agn_submitted": 3140,
-          "num_batches_submitted": 3,
-          "batch_ids": "['/12065/' '/12066/' '/12067/']",
-          "number_returned": 3128,
-          "number_broken_urls": 7,
-          "complete": true,
-          "from_queue": true
-        },
-        {
-          "submission_date": "2025-03-28 00:00:00.000",
-          "action": "missed update",
-          "complete": true
-        },
-        {
-          "submission_date": "2025-04-08 00:00:00.000",
-          "action": "missed update",
-          "complete": true
-        },
-        {
-          "catalog": "catnorth",
-          "submission_date": "2025-04-23 00:06:59.003",
-          "action": "update",
-          "num_agn_submitted": 12426,
-          "num_batches_submitted": 10,
-          "batch_ids": "['12090' '12091' '12092' '12093' '12094' '12095' '12096' '12097' '12098'\n '12099']",
-          "number_returned": 12273,
-          "number_broken_urls": 153,
-          "complete": true
-        },
-        {
-          "catalog": "catnorth",
-          "submission_date": "2025-05-05 17:08:16.807",
-          "action": "update",
-          "num_agn_submitted": 11454,
-          "num_batches_submitted": 8,
-          "batch_ids": "['12112' '12113' '12114' '12115' '12116' '12117' '12118' '12119']",
-          "number_returned": 9955,
-          "number_broken_urls": 1499,
-          "complete": true,
-          "from_queue": true
-        },
-        {
-          "catalog": "catnorth",
-          "submission_date": "2025-05-08 19:17:16.859",
-          "action": "update",
-          "num_agn_submitted": 8211,
-          "num_batches_submitted": 10,
-          "batch_ids": "['12128' '12129' '12130' '12131' '12132' '12133' '12134']",
-          "number_returned": 7500,
-          "number_broken_urls": 2,
-          "complete": true
-        },
-        {
-          "catalog": "catnorth",
-          "submission_date": "2025-05-09 17:54:03.807",
-          "action": "update",
-          "num_agn_submitted": 10885,
-          "num_batches_submitted": 8,
-          "batch_ids": "['12137' '12138' '12139' '12140' '12141' '12142' '12143' '12144']",
-          "number_returned": 10885,
-          "number_broken_urls": 0,
-          "complete": true,
-          "from_queue": true
-        },
-        {
-          "catalog": "catnorth",
-          "submission_date": "2025-05-19 17:53:09.128",
-          "action": "update",
-          "num_agn_submitted": 11209,
-          "num_batches_submitted": 7,
-          "batch_ids": "['12188' '12189' '12190' '12191' '12192' '12193' '12194']",
-          "number_returned": 10500,
-          "number_broken_urls": 0,
-          "complete": true
-        },
-        {
-          "catalog": "catnorth",
-          "submission_date": "2025-05-27 17:26:58.383",
-          "action": "update",
-          "num_agn_submitted": 12671,
-          "num_batches_submitted": 9,
-          "batch_ids": "['12220' '12221' '12222' '12223' '12224' '12225' '12226' '12227' '12228']",
-          "number_returned": 12671,
-          "number_broken_urls": 0,
-          "complete": true,
-          "from_queue": true
-        },
-        {
-          "catalog": "catnorth",
-          "submission_date": "2025-07-01 18:26:40.812",
-          "action": "update",
-          "num_agn_submitted": 11209,
-          "num_batches_submitted": 10,
-          "batch_ids": null,
-          "number_returned": null,
-          "number_broken_urls": null,
-          "complete": false
-        },
-        {
-          "catalog": "catnorth",
-          "submission_date": "2025-07-03 22:16:35.966",
-          "action": "update",
-          "num_agn_submitted": 12671,
-          "num_batches_submitted": 9,
-          "batch_ids": null,
-          "number_returned": null,
-          "number_broken_urls": null,
-          "complete": false,
-          "from_queue": true
+    "summary_stats": {
+        "total_requests": 143641,
+        "total_currently_pending": 0,
+        "total_saved": 103607
+    },
+    "events": {
+        "S250319bu": {
+            "dateobs": "2025-03-19T13:52:26Z",
+            "over_200_days": false,
+            "zfps": [
+                {
+                    "catalog": "catnorth",
+                    "submission_date": "2025-04-02 20:41:31.218",
+                    "action": "new",
+                    "num_agn_submitted": 15000,
+                    "num_batches_submitted": 10,
+                    "batch_ids": "['12010' '12011' '12012' '12013' '12014' '12015' '12016' '12017' '12018' '12019']",
+                    "number_returned": 14608,
+                    "number_broken_urls": 370,
+                    "complete": true
+                },
+                {
+                    "catalog": "catnorth",
+                    "submission_date": "2025-04-11 23:01:30.994",
+                    "action": "new",
+                    "num_agn_submitted": 3140,
+                    "num_batches_submitted": 3,
+                    "batch_ids": "['/12065/' '/12066/' '/12067/']",
+                    "number_returned": 3128,
+                    "number_broken_urls": 7,
+                    "complete": true,
+                    "from_queue": true
+                },
+                {
+                    "submission_date": "2025-03-28 00:00:00.000",
+                    "action": "missed update",
+                    "complete": true
+                },
+                {
+                    "submission_date": "2025-04-08 00:00:00.000",
+                    "action": "missed update",
+                    "complete": true
+                },
+                {
+                    "catalog": "catnorth",
+                    "submission_date": "2025-04-23 00:06:59.003",
+                    "action": "update",
+                    "num_agn_submitted": 12426,
+                    "num_batches_submitted": 10,
+                    "batch_ids": "['12090' '12091' '12092' '12093' '12094' '12095' '12096' '12097' '12098'\n '12099']",
+                    "number_returned": 12273,
+                    "number_broken_urls": 153,
+                    "complete": true
+                },
+                {
+                    "catalog": "catnorth",
+                    "submission_date": "2025-05-05 17:08:16.807",
+                    "action": "update",
+                    "num_agn_submitted": 11454,
+                    "num_batches_submitted": 8,
+                    "batch_ids": "['12112' '12113' '12114' '12115' '12116' '12117' '12118' '12119']",
+                    "number_returned": 9955,
+                    "number_broken_urls": 1499,
+                    "complete": true,
+                    "from_queue": true
+                },
+                {
+                    "catalog": "catnorth",
+                    "submission_date": "2025-05-08 19:17:16.859",
+                    "action": "update",
+                    "num_agn_submitted": 8211,
+                    "num_batches_submitted": 10,
+                    "batch_ids": "['12128' '12129' '12130' '12131' '12132' '12133' '12134']",
+                    "number_returned": 7500,
+                    "number_broken_urls": 2,
+                    "complete": true
+                },
+                {
+                    "catalog": "catnorth",
+                    "submission_date": "2025-05-09 17:54:03.807",
+                    "action": "update",
+                    "num_agn_submitted": 10885,
+                    "num_batches_submitted": 8,
+                    "batch_ids": "['12137' '12138' '12139' '12140' '12141' '12142' '12143' '12144']",
+                    "number_returned": 10885,
+                    "number_broken_urls": 0,
+                    "complete": true,
+                    "from_queue": true
+                },
+                {
+                    "catalog": "catnorth",
+                    "submission_date": "2025-05-19 17:53:09.128",
+                    "action": "update",
+                    "num_agn_submitted": 11209,
+                    "num_batches_submitted": 7,
+                    "batch_ids": "['12188' '12189' '12190' '12191' '12192' '12193' '12194']",
+                    "number_returned": 10500,
+                    "number_broken_urls": 0,
+                    "complete": true
+                },
+                {
+                    "catalog": "catnorth",
+                    "submission_date": "2025-05-27 17:26:58.383",
+                    "action": "update",
+                    "num_agn_submitted": 12671,
+                    "num_batches_submitted": 9,
+                    "batch_ids": "['12220' '12221' '12222' '12223' '12224' '12225' '12226' '12227' '12228']",
+                    "number_returned": 12671,
+                    "number_broken_urls": 0,
+                    "complete": true,
+                    "from_queue": true
+                },
+                {
+                    "catalog": "catnorth",
+                    "submission_date": "2025-07-07 16:22:45.100",
+                    "action": "update",
+                    "num_agn_submitted": 11209,
+                    "num_batches_submitted": 10,
+                    "batch_ids": "['12457' '12458' '12459' '12460' '12461' '12462' '12463' '12464' '12465'\n '12466']",
+                    "number_returned": 11202,
+                    "number_broken_urls": 7,
+                    "complete": true
+                },
+                {
+                    "catalog": "catnorth",
+                    "submission_date": "2025-07-11 16:31:04.389",
+                    "action": "update",
+                    "num_agn_submitted": 12671,
+                    "num_batches_submitted": 9,
+                    "batch_ids": null,
+                    "number_returned": null,
+                    "number_broken_urls": null,
+                    "complete": false,
+                    "from_queue": true
+                }
+            ]
         }
-      ]
     }
-  }
 }

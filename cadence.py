@@ -10,17 +10,28 @@ from trigger_utils.trigger_utils import (
     update_trigger_log,
     send_trigger_email,
 )
+from utils.log import Logger
 import yaml
 import time
 from astropy.time import Time
 
 
-print(f"Starting cadence.py at {Time.now()}")
-
 with open("config/Credentials.yaml", "r") as file:
     credentials = yaml.safe_load(file)
 testing = credentials["testing"]
 path_data = credentials["path_data"]
+kowalskiusername = credentials["kowalski_username"]
+kowalskipassword = credentials["kowalski_password"]
+
+# set up logging that writes messages locally, sends to slack, and sends emails
+if testing:
+    webhook = credentials["slack_webhook_testing"]
+else:
+    webhook = credentials["slack_webhook"]
+
+slackbot = Logger(webhook, filename="cadence")
+
+Logger.log(f"Starting cadence.py at at {Time.now()} with testing = {testing}")
 
 # choose whether we use preview.fritz or fritz api
 if testing:
@@ -33,12 +44,14 @@ else:
     allocation = credentials["allocation"]
 
 # look at any pending observations and determine whether we were successful in observing, if within 2 days automatically retry
-retry = parse_pending_observation(path_data, fritz_token, mode)
-print(f"retry: {retry}")
+retry = parse_pending_observation(
+    path_data, fritz_token, kowalskiusername, kowalskipassword, mode
+)
+Logger.log(f"retry: {retry}")
 
 # check if it is time for any follow-up triggers
 followup = trigger_on_cadence(path_data)
-print(f"followup: {followup}")
+Logger.log(f"followup: {followup}")
 
 # handle follow-up triggers both for those in the scheduled cadence and for those that were unsuccessful
 new_triggers = followup + retry
@@ -55,7 +68,7 @@ if new_triggers:
                 x[4],
             )
             # submit a plan request
-            print(f"Submitting plan request for {superevent_id}")
+            Logger.log(f"Submitting plan request for {superevent_id}")
             queuename = submit_plan(
                 fritz_token,
                 allocation,
@@ -75,7 +88,7 @@ if new_triggers:
                 )
                 time.sleep(30)
             if fritz_event_status is None:
-                print(f"Could not find an observing plan for {superevent_id}")
+                Logger.log(f"Could not find an observing plan for {superevent_id}")
                 raise MyException(
                     f"Could not find an observing plan for {superevent_id}"
                 )
@@ -96,10 +109,10 @@ if new_triggers:
                     append_string=True,
                 )
                 message = f"Followup plan for {superevent_id} with {total_time} seconds and {probability} probability does not meet criteria"
-                print(message)
+                Logger.log(message)
                 raise MyException(message)
 
-            print(
+            Logger.log(
                 f"Plan for {superevent_id} has {total_time} seconds and {probability} probability - should trigger ZTF"
             )
 
@@ -107,11 +120,11 @@ if new_triggers:
                 message = (
                     f"Testing mode, not actually triggering ZTF for {superevent_id}"
                 )
-                print(message)
+                Logger.log(message)
                 raise MyException(message)
 
             # send plan to ZTF queue
-            print(f"Triggering ZTF for {superevent_id} in 30 seconds")
+            Logger.log(f"Triggering ZTF for {superevent_id} in 30 seconds")
             time.sleep(30)
             trigger_ztf(observation_plan_request_id, fritz_token, mode)
             log_value = f"({observation_plan_request_id},{start_observation})"
@@ -128,8 +141,8 @@ if new_triggers:
             else:
                 message = f"Sending another trigger for tonight after unsuccessful observation of {superevent_id}"
             send_trigger_email(credentials, message, dateobs)
-            print(f"sent email: {message}")
+            Logger.log(f"sent email: {message}")
 
         except MyException as e:
-            print(e)
+            Logger.log(e)
             continue

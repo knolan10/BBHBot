@@ -15,6 +15,7 @@ from io import BytesIO
 import json
 import xmltodict
 import smtplib
+from penquins import Kowalski
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from ligo.gracedb.rest import GraceDb
@@ -48,13 +49,27 @@ def get_a(skymap, probarea):
 
 def get_params(dict):
     try:
+        # Ensure the input dictionary has the expected structure
+        if (
+            "voe:VOEvent" not in dict
+            or "What" not in dict["voe:VOEvent"]
+            or "Param" not in dict["voe:VOEvent"]["What"]
+        ):
+            raise MyException(
+                "Invalid format: Missing required keys in the input dictionary."
+            )
+
+        # Extract the event_id
         event_id = [
             item["@value"]
             for item in dict["voe:VOEvent"]["What"]["Param"]
             if item.get("@name") == "GraceID"
         ][0]
+        # avoid issues running code on non superevents
+        if event_id[0] != "S":
+            raise MyException(f"Not a superevent: {event_id}.")
     except MyException as e:
-        raise MyException(f"error getting params: could not parse graceid: {e}") from e
+        raise MyException(f"Error getting params: could not parse GraceID: {e}") from e
     try:
         t0 = dict["voe:VOEvent"]["WhereWhen"]["ObsDataLocation"]["ObservationLocation"][
             "AstroCoords"
@@ -220,7 +235,7 @@ def compute_plan_start_end():
         startdate = now
     else:
         startdate = sunset_time
-    # necessary? to be safe go an hour before sunset
+    # TODO necessary? to be safe go an hour before sunset
     startdate_return = (startdate - TimeDelta(1 * 3600, format="sec")).utc.iso
     enddate_return = (startdate + TimeDelta(1 * 3600 * 15, format="sec")).utc.iso
     return startdate_return, enddate_return
@@ -241,7 +256,7 @@ def check_before_sunset():
 
 def submit_plan(token, allocation_id, gracedbid, gcnevent_id, localization_id, mode):
     startdate, enddate = compute_plan_start_end()
-    queuename = f"{gracedbid}_BBHBot_{startdate}"
+    queuename = f"{gracedbid}_BBHBot_{startdate.replace(' ', '_')}"
 
     # field reference data is not loaded to preview instance of Fritz
     if mode == "preview.":
@@ -391,26 +406,116 @@ def delete_trigger_ztf(plan_request_id, token, mode):
         )
 
 
-#### Note - probably need to improve this
-def check_executed_observation(startdate, enddate, gcnid, token, mode):
-    """
-    verify that we observed the event
-    """
+# get ZTF coverage of skymap
 
-    url = f"https://{mode}fritz.science/api/observation"
-    data = {
-        "startDate": startdate,
-        "endDate": enddate,
-        # "localizationDateobs": dateobs,
-        "instrumentName": "ZTF",
-        "localizationName": gcnid,
-        "localizationCumprob": 0.9,
-        # "returnStatistics": True
-    }
 
-    headers = {"Content-Type": "application/json", "Authorization": f"token {token}"}
-    response = requests.request("GET", url, params=data, headers=headers)
-    return response.json()
+class SkymapCoverage:
+    def __init__(
+        self,
+        startdate,
+        enddate,
+        localdateobs,
+        localname,
+        localprob,
+        fritz_token,
+        fritz_mode,
+        kowalski_username,
+        kowalski_password,
+    ):
+        self.startdate = startdate
+        self.enddate = enddate
+        self.localdateobs = localdateobs
+        self.localname = localname
+        self.localprob = localprob
+        self.fritz_token = fritz_token
+        self.fritz_mode = fritz_mode
+        self.kowalski_username = kowalski_username
+        self.kowalski_password = kowalski_password
+
+    def connect_Kowalski(self):
+        """
+        Connect to Kowalski using credentials from the config file.
+        """
+
+        protocol = "https"
+        host = "kowalski.caltech.edu"
+        port = 443
+        timeout = 10
+
+        k = Kowalski(
+            protocol=protocol,
+            host=host,
+            port=port,
+            username=self.kowalski_username,
+            password=self.kowalski_password,
+            timeout=timeout,
+            verbose=False,
+        )
+        return k
+
+    def get_ztf_fields_observation(self):
+        k = self.connect_Kowalski()
+        query = {
+            "query_type": "find",
+            "query": {
+                "catalog": "ZTF_ops",
+                "filter": {
+                    "jd_start": {"$gte": self.startdate},
+                    "jd_end": {"$lte": self.enddate},
+                    "exp": {"$gte": 30},
+                    "filter": {"$in": [1, 2]},
+                    "qcomment": {
+                        "$nin": [
+                            "missing_FCD",
+                            "reference_building_g",
+                            "reference_building_r",
+                            "reference_building_i",
+                        ]
+                    },
+                },
+                "projection": {},
+            },
+        }
+
+        response = k.query(query=query, max_n_threads=12).get("default").get("data")
+        fields = [x["field"] for x in response]
+        print(
+            f"found {len(fields)} exposures of {len(list(set(fields)))} unique fields between JD {round(self.startdate)} and {round(self.enddate)}"
+        )
+        return fields
+
+    def get_ztf_fields_skymap(self):
+        """
+        get all the ZTF primary field IDs needed to cover a skymap
+        """
+        headers = {"Authorization": f"token {self.fritz_token}"}
+        endpoint = f"https://{self.fritz_mode}fritz.science/api/instrument/1?localizationDateobs={self.localdateobs}&localizationName={self.localname}&localizationCumprob={self.localprob}"
+        response = requests.request("GET", endpoint, headers=headers)
+        if response.status_code != 200:
+            raise Exception(
+                f"API call to ZTF queue failed with status code {response.status_code}. "
+                f"Response: {response.text}. Endpoint: {endpoint}"
+            )
+        json_string = response.content.decode("utf-8")
+        json_data = json.loads(json_string)
+        fields = [
+            x["field_id"]
+            for x in json_data["data"]["fields"]
+            if x["instrument_id"] == 1 and 220 < x["field_id"] < 880 and x["dec"] > -30
+        ]
+        return fields
+
+    def get_coverage_fraction(self):
+        observation_fields = self.get_ztf_fields_observation()
+        skymap_fields = self.get_ztf_fields_skymap()
+        skymap_observations = [
+            field for field in skymap_fields if field in observation_fields
+        ]
+        print(
+            f"found {len(skymap_observations)} / {len(skymap_fields)} fields observed in time period"
+        )
+        frac_observed = len(skymap_observations) / len(skymap_fields)
+        return frac_observed
 
 
 """
@@ -430,11 +535,16 @@ def generate_cadence_dates(date):
 
 def check_triggered_csv(superevent_id, path_data):
     df = pd.read_csv(f"{path_data}/trigger_data/triggered_events.csv")
-    triggered = superevent_id in df["superevent_id"].values
+    # todo: add serendipitious case
+    triggered = (
+        superevent_id in df["superevent_id"].values
+        and df.loc[df["superevent_id"] == superevent_id, "pending_observation"].any()
+    )
     if triggered:
-        trigger_plan_id = df[df["superevent_id"] == superevent_id][
-            "observation_plan_id"
+        pending = df[df["superevent_id"] == superevent_id][
+            "pending_observation"
         ].values[0]
+        trigger_plan_id = int(pending.strip("()").split(",")[0])
     else:
         trigger_plan_id = None
     return triggered, trigger_plan_id
