@@ -1,0 +1,80 @@
+20250722_16:15:13: Starting TriggerBot with testing = True
+20250722_16:15:14: subscribed to Kafka consumer with groupid BBHBOT_test137089 and topics ['gcn.classic.voevent.LVC_INITIAL', 'gcn.classic.voevent.LVC_UPDATE']
+20250722_16:15:14: heartbeat
+20250722_16:30:17: Starting flares.py at at 2025-07-22 16:30:17.810024 with testing = True
+20250722_16:30:18: ------------------PART 0: Check status, try to submit queued requests------------------
+20250722_16:30:18: -------------------------------PART 1: Photometry Requests-------------------------------
+20250722_16:30:30: found 0 new events
+20250722_16:30:32: ----------------------------------PART 2: Retrieve Photometry----------------------------------
+20250722_16:30:32: Checking 1 photometry requests
+20250722_16:30:32: Now checking 9 batches update request for event S250319bu on 2025-07-11 16:31:04.389
+20250722_16:30:45: ---------------------------------PART 3: Flare identification---------------------------------
+20250722_16:30:45: No new photometry to check for flares
+20250722_16:37:33: Starting flares.py at at 2025-07-22 16:37:33.877799 with testing = True
+20250722_16:37:34: PART 0: Check status, try to submit queued requests
+20250722_16:37:34: PART 1: Photometry Requests
+20250722_16:37:48: found 1 new events
+20250722_16:37:49: need to inspect event S250712cd for trigger status: ['error', 'missed plan request']
+20250722_16:37:50: Not automatically requesting photometry for event S250712cd because it has been more than 7 days
+20250722_16:44:47: Starting flares.py at at 2025-07-22 16:44:47.839524 with testing = True
+20250722_16:44:48: PART 0: Check status, try to submit queued requests
+20250722_16:44:48: PART 1: Photometry Requests
+20250722_16:45:02: found 1 new events
+20250722_16:45:03: need to inspect event S250712cd for trigger status: ['error', 'missed plan request']
+20250722_16:45:03: Not automatically requesting photometry for event S250712cd because it has been more than 7 days
+20250722_16:48:40: Starting flares.py at at 2025-07-22 16:48:40.264589 with testing = True
+20250722_16:48:40: PART 0: Check status, try to submit queued requests
+20250722_16:48:40: PART 1: Photometry Requests
+20250722_16:48:53: found 1 new events
+20250722_16:48:54: need to inspect event S250712cd for trigger status: ['error', 'missed plan request']
+20250722_16:48:55: Not automatically requesting photometry for event S250712cd because it has been more than 7 days
+20250722_16:48:55: Found event S250712cd to request new photometry for
+20250722_16:48:55: PART 2: Retrieve Photometry
+20250722_16:48:55: Checking 1 photometry requests
+20250722_16:48:56: Now checking 9 batches update request for event S250319bu on 2025-07-11 16:31:04.389
+20250722_16:49:05: PART 3: Flare identification
+20250722_16:49:06: No new photometry to check for flares
+20250722_17:23:08: Starting flares.py at at 2025-07-22 17:23:08.662316 with testing = True
+20250722_17:23:08: PART 0: Check status, try to submit queued requests
+20250722_17:23:09: PART 1: Photometry Requests
+20250722_17:23:23: found 1 new events
+20250722_18:02:55: Starting flares.py at at 2025-07-22 18:02:55.000081 with testing = True
+20250722_18:02:55: PART 0: Check status, try to submit queued requests
+20250722_18:02:55: PART 1: Photometry Requests
+20250722_18:03:08: found 1 new events
+20250722_18:04:34: Starting flares.py at at 2025-07-22 18:04:34.374686 with testing = True
+20250722_18:04:34: PART 0: Check status, try to submit queued requests
+20250722_18:04:35: PART 1: Photometry Requests
+20250722_18:04:49: found 1 new events
+20250722_18:04:50: need to inspect event S250712cd for trigger status: ['error', 'missed plan request']
+20250722_18:04:50: Not automatically requesting photometry for event S250712cd because it has been more than 7 days
+20250722_18:04:51: Found event S250712cd to request new photometry for
+20250722_18:04:51: Submitting update photometry request for event S250712cd
+20250722_18:24:57: Starting cadence.py at at 2025-07-22 18:24:57.951344 with testing = True
+20250722_18:24:58: retry: []
+20250722_18:24:58: followup: []
+20250722_18:51:23: Starting TriggerBot with testing = True
+20250722_18:51:24: subscribed to Kafka consumer with groupid BBHBOT_test973787 and topics ['gcn.classic.voevent.LVC_INITIAL', 'gcn.classic.voevent.LVC_UPDATE']
+20250722_18:51:24: heartbeat
+20250722_18:51:58: Starting cadence.py at at 2025-07-22 18:51:58.040768 with testing = True
+20250722_18:51:58: retry: []
+20250722_18:51:58: followup: []
+20250722_18:52:08: Starting flares.py at at 2025-07-22 18:52:08.724993 with testing = True
+20250722_18:52:08: PART 0: Check status, try to submit queued requests
+20250722_18:52:09: PART 1: Photometry Requests
+20250722_18:52:21: found 0 new events
+20250722_18:52:23: Submitting update photometry request for event S250712cd
+20250722_18:59:47: Starting flares.py at at 2025-07-22 18:59:47.738173 with testing = True
+20250722_18:59:47: PART 0: Check status, try to submit queued requests
+20250722_18:59:48: PART 1: Photometry Requests
+20250722_19:01:51: Starting flares.py at at 2025-07-22 19:01:51.664603 with testing = True
+20250722_19:01:51: PART 0: Check status, try to submit queued requests
+20250722_19:01:52: PART 1: Photometry Requests
+20250722_19:02:06: found 1 new events
+20250722_19:02:07: need to inspect event S250712cd for trigger status: ['error', 'missed plan request']
+20250722_19:02:07: Not automatically requesting photometry for event S250712cd because it has been more than 7 days
+20250722_19:02:07: Found event S250712cd to request new photometry for
+20250722_19:02:08: PART 2: Retrieve Photometry
+20250722_19:02:08: Checking 0 photometry requests
+20250722_19:02:08: PART 3: Flare identification
+20250722_19:02:08: No new photometry to check for flares

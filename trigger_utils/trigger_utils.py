@@ -166,26 +166,28 @@ def m_total_mlp(MLP_model, dl_bbh, far, dl_bns=168.0):
     return 10.0**mass
 
 
-def query_mchirp_gracedb(event):
+def query_mchirp_gracedb(event, path_data):
     """
     Fetches chirp mass .json from GraceDB
     """
     client = GraceDb(service_url="https://gracedb.ligo.org/api/")
 
     files = client.files(event).json()
+    file_data = None
 
     for fname in files:
         if "mchirp_source" in fname and fname.endswith(".json"):
             print(f"Found: {fname}")
             file_data = client.files(event, fname)
-            with open("mchirp_source.json", "wb") as f:
+            with open(f"{path_data}/mchirp/mchirp_source_{event}.json", "wb") as f:
                 f.write(file_data.read())
             break
-        else:
-            print(f"Did not find chirp mass file on Gracedb event page for {event}")
-            return None
 
-    with open("mchirp_source.json", "r") as f:
+    if not file_data:
+        print(f"Did not find chirp mass file on Gracedb event page for {event}")
+        return None
+
+    with open(f"{path_data}/mchirp/mchirp_source_{event}.json", "r") as f:
         data = json.load(f)
 
     max_index = data["probabilities"].index(max(data["probabilities"]))

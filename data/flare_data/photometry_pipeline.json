@@ -131,8 +131,9 @@
                     "batch_ids": null,
                     "number_returned": null,
                     "number_broken_urls": null,
-                    "complete": false,
-                    "from_queue": true
+                    "complete": true,
+                    "from_queue": true,
+                    "note": "unsuccessful update, no batches returned"
                 }
             ]
         }

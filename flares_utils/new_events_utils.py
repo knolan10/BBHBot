@@ -25,6 +25,8 @@ from ligo.gracedb.rest import GraceDb
 from penquins import Kowalski
 from matplotlib import rcParams
 
+from trigger_utils.trigger_utils import query_mchirp_gracedb
+
 rcParams["font.family"] = "Liberation Serif"
 
 g = GraceDb()
@@ -286,7 +288,11 @@ class GetSuperevents:
         far = [x[9] for x in params]
         MLP = pickle.load(open(self.mlp_modelpath, "rb"))
         mass = [self.m_total_mlp(MLP, d, f, dl_bns=168.0) for d, f in zip(dist, far)]
-        return [list(i) + list(j) + [k] for i, j, k in zip(params, skymap_data, mass)]
+        chirpmass = [query_mchirp_gracedb(str(x[0]), self.path_data) for x in params]
+        return [
+            list(i) + list(j) + [k] + [chirp]
+            for i, j, k, chirp in zip(params, skymap_data, mass, chirpmass)
+        ]
 
 
 class Fritz:
@@ -502,6 +508,7 @@ class NewEventsToDict:
             for x in self.params
         ]
         mass_format = [round(x[22]) for x in self.params]
+        chirp_mass = [x[23] for x in self.params]
         dist_format = [round(x[13] / 10**3, 2) for x in self.params]
         a50_format = [round(x[17]) for x in self.params]
         a90_format = [round(x[16]) for x in self.params]
@@ -526,6 +533,7 @@ class NewEventsToDict:
                 "Distance (Gpc)": dist_format,
                 "FAR (years/FA)": far_format,
                 "Mass (M_sol)": mass_format,
+                "Chirp Mass (left edge)": chirp_mass,
                 "gcnids": gcnid,
                 "trigger": trigger,
                 "plan time": total_time,
@@ -566,6 +574,7 @@ class NewEventsToDict:
                 "Distance (Gpc)",
                 "FAR (years/FA)",
                 "Mass (M_sol)",
+                "Chirp Mass (left edge)",
                 "gcnids",
                 "trigger",
             ]
@@ -955,6 +964,7 @@ class PushEventsPublic:
             "Distance (Gpc)",
             "FAR (years/FA)",
             "Mass (M_sol)",
+            "Chirp Mass (left edge)",
             "gcnids",
             "time",
             "probability",
@@ -1010,13 +1020,22 @@ class PushEventsPublic:
         ax1.tick_params(axis="x", rotation=30)
 
         for i, row in df_before_cutoff.iterrows():
-            ax1.annotate(
-                f"{row['Mass (M_sol)']}M$_{{\\odot}}$",
-                (row["GW MJD"], 0.1),
-                textcoords="offset points",
-                xytext=(0, -5),
-                ha="center",
-            )
+            if row["Chirp Mass (left edge)"]:
+                ax1.annotate(
+                    f"{row['Chirp Mass (left edge)']}Mchirp",
+                    (row["GW MJD"], 0.1),
+                    textcoords="offset points",
+                    xytext=(0, -5),
+                    ha="center",
+                )
+            else:
+                ax1.annotate(
+                    f"{row['Mass (M_sol)']}M$_{{\\odot}}$",
+                    (row["GW MJD"], 0.1),
+                    textcoords="offset points",
+                    xytext=(0, -5),
+                    ha="center",
+                )
 
         # Plot points for O4c
         ax2.scatter(
@@ -1041,13 +1060,22 @@ class PushEventsPublic:
         ax2.tick_params(axis="x", rotation=30)
 
         for i, row in df_after_cutoff.iterrows():
-            ax2.annotate(
-                f"{row['Mass (M_sol)']}M$_{{\\odot}}$",
-                (row["GW MJD"], 0.1),
-                textcoords="offset points",
-                xytext=(0, -5),
-                ha="center",
-            )
+            if row["Chirp Mass (left edge)"]:
+                ax2.annotate(
+                    f"{row['Chirp Mass (left edge)']}Mchirp",
+                    (row["GW MJD"], 0.1),
+                    textcoords="offset points",
+                    xytext=(0, -5),
+                    ha="center",
+                )
+            else:
+                ax2.annotate(
+                    f"{row['Mass (M_sol)']}M$_{{\\odot}}$",
+                    (row["GW MJD"], 0.1),
+                    textcoords="offset points",
+                    xytext=(0, -5),
+                    ha="center",
+                )
         plt.suptitle("Timeline of Triggered Observations", fontsize=20)
         plt.tight_layout()
         plt.show()
@@ -1140,6 +1168,14 @@ class PushEventsPublic:
         # put newest events at the top
         df_full = df_full.sort_values(by="GW MJD", ascending=False)
         df_full = df_full.reset_index(drop=True)
+        # move Chirp Mass (left edge) to the right of Mass (M_sol)
+        if "Chirp Mass (left edge)" in df_full.columns:
+            chirp_mass = df_full.pop("Chirp Mass (left edge)")
+            df_full.insert(
+                df_full.columns.get_loc("Mass (M_sol)") + 1,
+                "Chirp Mass (left edge)",
+                chirp_mass,
+            )
         # remove trigger_plan, gcnids
         df = df_full.drop(
             columns=[
@@ -1156,13 +1192,16 @@ class PushEventsPublic:
             ]
         )
         # custom comments
-        # TODO: put this in maintenence doc
+        # TODO: make a comments dictionary that this draws instead of hardcoding here
         df["comments"] = ""
         df.loc[df["graceids"].str.contains("S240921cw"), "comments"] = "moon too close"
         df.loc[df["graceids"].str.contains("S241125n"), "comments"] = (
             "Swift/Bat coincident detection"
         )
         df.loc[df["graceids"].str.contains("S241130n"), "comments"] = "sun too close"
+        df.loc[df["graceids"].str.contains("S250712cd"), "comments"] = (
+            "serendipitous coverage"
+        )
 
         # priority df
         df_priority = df[
@@ -1178,12 +1217,21 @@ class PushEventsPublic:
         confident = df_priority[
             df_priority["FAR (years/FA)"] > 10
         ]  # FAR is in units of years per false alert
-        high_mass = df_priority[df_priority["Mass (M_sol)"] > 60]
+        high_mass = df_priority[
+            (
+                df_priority["Chirp Mass (left edge)"].notna()
+                & (df_priority["Chirp Mass (left edge)"] >= 22)
+            )
+            | (
+                df_priority["Chirp Mass (left edge)"].isna()
+                & (df_priority["Mass (M_sol)"] > 60)
+            )
+        ]
         low_area = df_priority[df_priority["90% Area (deg2)"] < 1000]
         highmass_lowarea = pd.merge(high_mass, low_area)
         priority = pd.merge(highmass_lowarea, confident)
         print(
-            f"{len(priority)} {self.observing_run} events with FAR > 10 and mass > 60 and area < 1000 sq deg"
+            f"{len(priority)} {self.observing_run} events with FAR > 10 and mchirp>22 (mass > 60) and area < 1000 sq deg"
         )
         # #manual edits
         priority.loc[priority["GW MJD"] == 60572, "gcnids"] = (
@@ -1215,9 +1263,7 @@ class PushEventsPublic:
                 col for col in ["trigger", "trigger plan"] if col in trigger_df.columns
             ]
         )
-        # TODO: remove?
-        # trigger_df = trigger_df.iloc[::-1].reset_index(drop=True)
-        # trigger_df = trigger_df.reset_index(drop=True)
+
         # manual edits
         trigger_df.loc[trigger_df["GW MJD"] == 60572, "gcnids"] = (
             "[2024-09-19T06:15:59](https://fritz.science/gcn_events/2024-09-19T06:15:59)"
@@ -1243,9 +1289,7 @@ class PushEventsPublic:
                 if col in error_triggers.columns
             ]
         )
-        # TODO: remove?
-        # error_triggers = error_triggers.iloc[::-1].reset_index(drop=True)
-        # error_triggers = error_triggers.reset_index(drop=True)
+
         # manual edits
         error_triggers.loc[error_triggers["GW MJD"] == 60573, "gcnids"] = (
             "[2024-09-20T07:34:24](https://fritz.science/gcn_events/2024-09-20T07:34:24)"

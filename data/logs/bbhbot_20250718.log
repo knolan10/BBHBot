@@ -1,0 +1,26 @@
+20250718_16:56:22: Starting TriggerBot with testing = True
+20250718_16:56:23: subscribed to Kafka consumer with groupid ztfmasstrigger661387 and topics ['gcn.classic.voevent.LVC_INITIAL', 'gcn.classic.voevent.LVC_UPDATE']
+20250718_16:56:23: heartbeat
+20250718_16:57:23: heartbeat
+20250718_16:58:23: heartbeat
+20250718_16:59:23: heartbeat
+20250718_17:05:20: Starting TriggerBot with testing = True
+20250718_17:05:21: subscribed to Kafka consumer with groupid ztfmasstrigger713437 and topics ['gcn.classic.voevent.LVC_INITIAL']
+20250718_17:05:21: heartbeat
+20250718_17:06:21: heartbeat
+20250718_17:07:06: Starting TriggerBot with testing = True
+20250718_17:07:07: subscribed to Kafka consumer with groupid ztfmasstrigger120440 and topics ['gcn.classic.voevent.LVC_PRELIMINARY', 'gcn.classic.voevent.LVC_INITIAL', 'gcn.classic.voevent.LVC_UPDATE']
+20250718_17:07:07: heartbeat
+20250718_17:08:07: heartbeat
+20250718_17:08:31: Starting TriggerBot with testing = True
+20250718_17:08:32: subscribed to Kafka consumer with groupid ztfmasstriggertest975486 and topics ['gcn.classic.voevent.LVC_PRELIMINARY', 'gcn.classic.voevent.LVC_INITIAL', 'gcn.classic.voevent.LVC_UPDATE']
+20250718_17:08:32: heartbeat
+20250718_17:09:32: heartbeat
+20250718_17:10:27: Starting TriggerBot with testing = False
+20250718_17:10:28: subscribed to Kafka consumer with groupid ztfmasstrigger and topics ['gcn.classic.voevent.LVC_PRELIMINARY', 'gcn.classic.voevent.LVC_INITIAL', 'gcn.classic.voevent.LVC_UPDATE']
+20250718_17:10:28: heartbeat
+20250718_17:11:28: heartbeat
+20250718_17:54:15: Starting TriggerBot with testing = True
+20250718_17:54:15: subscribed to Kafka consumer with groupid BBHBOT_test486311 and topics ['gcn.classic.voevent.LVC_INITIAL', 'gcn.classic.voevent.LVC_UPDATE']
+20250718_17:54:16: heartbeat
+20250718_17:55:16: heartbeat

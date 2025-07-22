@@ -19,9 +19,11 @@ The steps executed in [trigger](../trigger.py) go as follows:
    - If these criteria aren't met, we stop here. We check if a previous GCN from this event prompted a trigger, and if it did we edit our file tracking triggers to indicate that the event is no longer viable. We attempt to retract the submitted trigger if timing allows.
    - We skip over the first preliminary notice for events, because the second preliminary notice tends to come within seconds and have significantly improved inference.
 
-3. We then use our MLP model to predict the mass of the merger and select mergers with mass > 60 solar masses.
+3. We attempt to retrieve the chirp mass file for the event from GraceDB, and select mergers with mchirp > 22.
 
-   - For merger mass < 60 solar masses, we stop here. Once again we check if a previous GCN for the event passed the mass cut, and if needed update the file tracking triggers to indicate that the event is no longer viable and attempt to retract any trigger.
+   - For merger mchirp < 60 solar masses, we stop here. Once again we check if a previous GCN for the event passed the mass cut, and if needed update the file tracking triggers to indicate that the event is no longer viable and attempt to retract any trigger.
+
+   - If we cannot retrieve the chirp mass file (which should not happen), we revert to our old MLP model to predict the mass of the merger and select mergers with mass > 60 solar masses.
 
 4. We pause for 30 seconds to ensure the event has been loaded by Fritz. We then query Fritz every 30 seconds up to 5 minutes, until we can retrieve the GCN event from Fritz. We save the `gcnevent_id` and `localization_id` assigned by Fritz.
 
@@ -39,7 +41,7 @@ The steps executed in [trigger](../trigger.py) go as follows:
 
 10. If we have triggered on an earlier GCN for the event, we check if it is currently before sunset. If it is before sunset, we will remove our submitted trigger and submit a new trigger with the most recent inference.
 
-11. We check coverage of the skymap over the previous two nights, and if we serendipitiously covered the 90% localization in that time period, then we will not trigger ZTF. However we will still create a log of this event along with all of the other triggered events, which will put it in the pipeline for automated followup observations and flare detection.
+11. We check coverage of the skymap over the previous ~2 nights, and if we serendipitiously covered the 90% localization in that time period, then we will not trigger ZTF. However we will still create a log of this event along with all of the other triggered events, which will put it in the pipeline for automated followup observations and flare detection.
 
 12. We submit the plan to the ZTF queue, and update our bookkeeping:
     - We add the event to [triggered_events](../data/trigger_data/triggered_events.csv)

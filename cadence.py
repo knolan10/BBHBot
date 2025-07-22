@@ -29,9 +29,9 @@ if testing:
 else:
     webhook = credentials["slack_webhook"]
 
-slackbot = Logger(webhook, filename="cadence")
+logger = Logger(webhook, filename="cadence")
 
-Logger.log(f"Starting cadence.py at at {Time.now()} with testing = {testing}")
+logger.log(f"Starting cadence.py at at {Time.now()} with testing = {testing}")
 
 # choose whether we use preview.fritz or fritz api
 if testing:
@@ -47,11 +47,11 @@ else:
 retry = parse_pending_observation(
     path_data, fritz_token, kowalskiusername, kowalskipassword, mode
 )
-Logger.log(f"retry: {retry}")
+logger.log(f"retry: {retry}")
 
 # check if it is time for any follow-up triggers
 followup = trigger_on_cadence(path_data)
-Logger.log(f"followup: {followup}")
+logger.log(f"followup: {followup}")
 
 # handle follow-up triggers both for those in the scheduled cadence and for those that were unsuccessful
 new_triggers = followup + retry
@@ -68,7 +68,7 @@ if new_triggers:
                 x[4],
             )
             # submit a plan request
-            Logger.log(f"Submitting plan request for {superevent_id}")
+            logger.log(f"Submitting plan request for {superevent_id}")
             queuename = submit_plan(
                 fritz_token,
                 allocation,
@@ -88,7 +88,7 @@ if new_triggers:
                 )
                 time.sleep(30)
             if fritz_event_status is None:
-                Logger.log(f"Could not find an observing plan for {superevent_id}")
+                logger.log(f"Could not find an observing plan for {superevent_id}")
                 raise MyException(
                     f"Could not find an observing plan for {superevent_id}"
                 )
@@ -109,10 +109,10 @@ if new_triggers:
                     append_string=True,
                 )
                 message = f"Followup plan for {superevent_id} with {total_time} seconds and {probability} probability does not meet criteria"
-                Logger.log(message)
+                logger.log(message)
                 raise MyException(message)
 
-            Logger.log(
+            logger.log(
                 f"Plan for {superevent_id} has {total_time} seconds and {probability} probability - should trigger ZTF"
             )
 
@@ -120,11 +120,11 @@ if new_triggers:
                 message = (
                     f"Testing mode, not actually triggering ZTF for {superevent_id}"
                 )
-                Logger.log(message)
+                logger.log(message)
                 raise MyException(message)
 
             # send plan to ZTF queue
-            Logger.log(f"Triggering ZTF for {superevent_id} in 30 seconds")
+            logger.log(f"Triggering ZTF for {superevent_id} in 30 seconds")
             time.sleep(30)
             trigger_ztf(observation_plan_request_id, fritz_token, mode)
             log_value = f"({observation_plan_request_id},{start_observation})"
@@ -141,8 +141,8 @@ if new_triggers:
             else:
                 message = f"Sending another trigger for tonight after unsuccessful observation of {superevent_id}"
             send_trigger_email(credentials, message, dateobs)
-            Logger.log(f"sent email: {message}")
+            logger.log(f"sent email: {message}")
 
         except MyException as e:
-            Logger.log(e)
+            logger.log(e)
             continue

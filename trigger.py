@@ -5,6 +5,8 @@ import pickle
 import random
 import threading
 from astropy.time import Time, TimeDelta
+from ligo.gracedb.exceptions import HTTPError
+
 from trigger_utils.trigger_utils import (
     parse_gcn_dict,
     get_params,
@@ -25,8 +27,6 @@ from trigger_utils.trigger_utils import (
     send_trigger_email,
     MyException,
 )
-from utils.log import log
-from ligo.gracedb.exceptions import HTTPError
 from utils.log import Logger
 
 with open("config/Credentials.yaml", "r") as file:
@@ -57,14 +57,12 @@ else:
     fritz_token = credentials["fritz_token"]
     allocation = credentials["allocation"]
 
-MLP = pickle.load(open("utils/mlp_model.sav", "rb"))
-
 # settings to subscribe to the Kafka topics
 if testing:
-    configid = f"ztfmasstrigger{random.randint(0, 1000000)}"
+    configid = f"BBHBOT_test{random.randint(0, 1000000)}"
     topics = ["gcn.classic.voevent.LVC_INITIAL", "gcn.classic.voevent.LVC_UPDATE"]
 else:
-    configid = "ztfmasstrigger"
+    configid = credentials["config_id"]
     topics = [
         "gcn.classic.voevent.LVC_PRELIMINARY",
         "gcn.classic.voevent.LVC_INITIAL",
@@ -93,7 +91,6 @@ heartbeat_thread = threading.Thread(target=logger.heartbeat())
 heartbeat_thread.daemon = True
 heartbeat_thread.start()
 
-# FIXME one initial thought with this, will this be pinging GraceDB repeatedly, could consider saving the file
 while True:
     try:
         for message in consumer.consume(timeout=1.0):
@@ -140,7 +137,7 @@ while True:
                             superevent_id, "valid", False, path_data=path_data
                         )
                         delete_trigger_ztf(trigger_plan_id, fritz_token, mode)
-                        log(f"attempting to remove trigger for {superevent_id}")
+                        logger.log(f"attempting to remove trigger for {superevent_id}")
                     logmessage = f"{superevent_id} did not pass initial criteria"
                     logger.log(logmessage)
                     raise MyException(logmessage)
@@ -152,7 +149,9 @@ while True:
                 while mchirp is None and time.time() < end_time:
                     try:
                         # grab the left bin edge for the most probable mchirp bin
-                        mchirp = query_mchirp_gracedb(superevent_id)
+                        mchirp = query_mchirp_gracedb(
+                            superevent_id, path_data=path_data
+                        )
                         # trigger on most probable bins >= 22
                         if mchirp and mchirp < 22:
                             if triggered:
@@ -160,19 +159,23 @@ while True:
                                     superevent_id, "valid", False, path_data=path_data
                                 )
                                 delete_trigger_ztf(trigger_plan_id, fritz_token, mode)
-                                log(f"attempting to remove trigger for {superevent_id}")
+                                logger.log(
+                                    f"attempting to remove trigger for {superevent_id}"
+                                )
                             logmessage = f"{superevent_id} did not pass mass criteria"
-                            log(logmessage)
+                            logger.log(logmessage)
                             raise MyException(logmessage)
 
                     except HTTPError:
                         logmessage = f"GraceDB HTTPError for {superevent_id}, retrying in 60 seconds"
-                        log(logmessage)
+                        logger.log(logmessage)
 
                     time.sleep(60)
                 if mchirp is None:
+                    # revert to the mass prediction
                     logmessage = f"Could not find a chirp mass file on GraceDB for {superevent_id}"
-                    log(logmessage)
+                    logger.log(logmessage)
+                    MLP = pickle.load(open("utils/mlp_model.sav", "rb"))
                     mass = m_total_mlp(MLP, distmean, far, dl_bns=168.0)
                     if mass < 60:
                         if triggered:
@@ -180,9 +183,11 @@ while True:
                                 superevent_id, "valid", False, path_data=path_data
                             )
                             delete_trigger_ztf(trigger_plan_id, fritz_token, mode)
-                            log(f"attempting to remove trigger for {superevent_id}")
+                            logger.log(
+                                f"attempting to remove trigger for {superevent_id}"
+                            )
                         logmessage = f"{superevent_id} did not pass mass criteria"
-                        log(logmessage)
+                        logger.log(logmessage)
                         raise MyException(logmessage)
                         delete_trigger_ztf(trigger_plan_id, fritz_token, mode)
                         logger.log(f"attempting to remove trigger for {superevent_id}")
@@ -233,7 +238,7 @@ while True:
                     time.sleep(30)
                 if fritz_event_status is None:
                     logmessage = f"Could not find an observing plan for {superevent_id}"
-                    log(logmessage)
+                    logger.log(logmessage)
                     raise MyException(logmessage)
 
                 # API call to Kowalski - check for event keywords in ZTF observing queue

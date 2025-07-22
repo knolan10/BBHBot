@@ -2,6 +2,7 @@ astropy
 astropy-healpix
 astroplan
 ligo.skymap
+ligo-gracedb
 matplotlib
 numpy
 gcn_kafka

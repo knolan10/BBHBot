@@ -25,7 +25,9 @@ class FlarePreprocessing:
         self.observing_run = observing_run
 
     def load_event_lightcurves(self):
-        # open the stored event info
+        """
+        For a Graceid, load the lightcurves dataframes and the coordinates for the AGN in the event
+        """
         with gzip.open(
             f"{self.path_data}/flare_data/dicts/crossmatch_dict_{self.observing_run}.gz",
             "rb",
@@ -44,7 +46,8 @@ class FlarePreprocessing:
 
     def load_simulated_lightcurves(self):
         """
-        open the simulated lightcurves
+        Open the simulated lightcurves
+        This is an alternative to the load_event_lightcurves method
         """
         path = self.path_photometry
         df = [
@@ -71,6 +74,10 @@ class FlarePreprocessing:
         return df2
 
     def get_calibrated_mags(self, df):
+        """
+        Get the calibrated magnitudes from the total fluxes.
+        Also following guidelines in the ZFPS documentation
+        """
         SNT = 3  # Signal-to-Noise Threshold (for declaring significant detection)
         SNU = 5  # Signal-to-Noise Upper Limit (for assigning upper limit)
         # We have a "confident" detection; compute mag with error bar:
@@ -86,10 +93,17 @@ class FlarePreprocessing:
         return (df_conf, df_lim)
 
     def get_single_filter(self, filter, df):
+        """
+        Get only photometry for a single color filter
+        """
         df_sf = df[(df["filter"] == filter)]
         return df_sf
 
     def process_for_flare(self):
+        """
+        Some data formatting
+        Return a list where each item corresponds to an AGN and lists the g,r,i photometry dataframes and the radec as a unique identifier
+        """
         batch_photometry_filtered, radec = self.load_event_lightcurves()
         df_with_SNR = [self.get_total_fluxes(lc) for lc in batch_photometry_filtered]
         df_with_mag = [self.get_calibrated_mags(lc)[0] for lc in df_with_SNR]
@@ -125,7 +139,7 @@ class RollingWindowStats:
         self.observing_run = observing_run
         self.dateobs = dateobs
 
-        # open the stored event info
+        # retrieve the event dateobs if it is not provided
         if not self.dateobs:
             with open(
                 f"{self.path_data}/flare_data/dicts/events_dict_{self.observing_run}.json",
@@ -137,7 +151,7 @@ class RollingWindowStats:
     def calculate_meds_mads(self, df):
         """
         this returns a list of where each item corresponds to an AGN
-        with in each AGN there is a list of 3 items: stats for G,R,I filters
+        within each AGN there is a list of 3 items: stats for G,R,I filters
         within each filter there is a list of 3 items: medians, mads, jds
         """
         medians_pre = []
@@ -182,6 +196,9 @@ class RollingWindowStats:
         return medians_pre, mads_pre, medians_post, mads_post, jds
 
     def get_rolling_window_stats(self):
+        """
+        Return the stats as specified above
+        """
         gri_stats = []
         for agn in self.agn:
             stats_for_agn = [self.calculate_meds_mads(df) for df in agn[0:3]]
@@ -222,7 +239,8 @@ class RollingWindowHeuristic:
 
     def medians_test(self):
         """
-        all medians post gw are brighter than x sigma of x % of baseline medians
+        require all medians post gw to be brighter than x sigma (input: k_mad) of x % (input: percent) of baseline medians
+        run independantly on g,r, and i and return indices of candidates in each respectice band.
         """
         # g
         stats_g = [i[0] for i in self.rolling_stats]
@@ -283,6 +301,7 @@ class RollingWindowHeuristic:
     def flares_across_filters(self, g, r, i):
         """
         find detections in common between different colors
+        return indices of candidates with flares in g and r, and then in g,r,i
         """
         gr = np.intersect1d(g, r)
         print(f"{len(gr)} AGN have flares in g and r filters")

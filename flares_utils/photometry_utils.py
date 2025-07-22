@@ -1001,7 +1001,7 @@ class PhotometryLog:
             self.photometry_pipeline["events"][event_id] = event_data
             print(event_data)
             try:
-                if isinstance(event_data["zfps"], str):
+                if isinstance(event_data["zfps"][0], str):
                     num_agn = 0
                 else:
                     num_agn = event_data["zfps"]["num_agn_submitted"]
