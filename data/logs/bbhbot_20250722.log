@@ -78,3 +78,20 @@
 20250722_19:02:08: Checking 0 photometry requests
 20250722_19:02:08: PART 3: Flare identification
 20250722_19:02:08: No new photometry to check for flares
+20250722_20:29:01: Starting TriggerBot with testing = True
+20250722_20:29:02: subscribed to Kafka consumer with groupid BBHBOT_test719230 and topics ['gcn.classic.voevent.LVC_INITIAL', 'gcn.classic.voevent.LVC_UPDATE']
+20250722_20:29:02: heartbeat
+20250722_20:30:02: heartbeat
+20250722_20:31:02: heartbeat
+20250722_20:32:02: heartbeat
+20250722_20:33:02: heartbeat
+20250722_20:34:02: heartbeat
+20250722_20:35:02: heartbeat
+20250722_20:36:02: heartbeat
+20250722_20:37:02: heartbeat
+20250722_20:38:02: heartbeat
+20250722_20:39:02: heartbeat
+20250722_20:40:02: heartbeat
+20250722_20:41:02: heartbeat
+20250722_20:42:02: heartbeat
+20250722_20:43:02: heartbeat

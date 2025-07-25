@@ -25,7 +25,11 @@ from ligo.gracedb.rest import GraceDb
 from penquins import Kowalski
 from matplotlib import rcParams
 
-from trigger_utils.trigger_utils import query_mchirp_gracedb
+from trigger_utils.trigger_utils import query_mchirp_gracedb, SkymapCoverage
+from utils.log import Logger
+
+# set up logger (this one wont send to slack)
+logger = Logger(filename="cadence_utils")
 
 rcParams["font.family"] = "Liberation Serif"
 
@@ -41,8 +45,8 @@ class GetSuperevents:
         self,
         path_data,
         event_source,
+        observing_run,
         mlp_modelpath="utils/mlp_model.sav",
-        observing_run="O4c",
         kafka_response=None,
         retrieve_all=False,
     ):
@@ -187,7 +191,8 @@ class GetSuperevents:
                 fritz_dateid,
             )
         except MyException as e:
-            print(f"error loading xml: {response}: {e}")
+            logmessage = f"error loading xml: {response}: {e}"
+            logger.log(logmessage, slack=False)
 
     def proc_skymap(self, skymap_url):
         skymap_response = requests.get(skymap_url)
@@ -242,7 +247,8 @@ class GetSuperevents:
                 skymap,
             )
         except MyException as e:
-            print(f"error loading skymap {skymap_url}: {e}")
+            logmessage = f"error loading skymap {skymap_url}: {e}"
+            logger.log(logmessage, slack=False)
             return "None"
 
     def m_total_mlp(self, MLP_model, dl_bbh, far, dl_bns=168.0):
@@ -256,7 +262,10 @@ class GetSuperevents:
         if self.event_source == "gracedb":
             event_iterator = g.superevents(f"runid: {self.observing_run} SIGNIF_LOCKED")
             graceids = [superevent["superevent_id"] for superevent in event_iterator]
-            print(f"{len(graceids)} significant superevents in {self.observing_run}")
+            logmessage = (
+                f"{len(graceids)} significant superevents in {self.observing_run}"
+            )
+            logger.log(logmessage, slack=False)
             responses = [g.superevent(id) for id in graceids]
             data = [r.json() for r in responses]
             if not self.retrieve_all:
@@ -278,9 +287,8 @@ class GetSuperevents:
         gcn_params = [self.get_params(url) for url in response]
         low_prob_bbh = [x for x in gcn_params if x[7] < 0.5 or x[8] > 0.3]
         params = [x for x in gcn_params if x[7] > 0.5 and x[8] < 0.3]
-        print(
-            f"{len(params)} new events to process (cut {len(low_prob_bbh)} low prob bbh events)"
-        )
+        logmessage = f"{len(params)} new events to process (cut {len(low_prob_bbh)} low prob bbh events)"
+        logger.log(logmessage, slack=False)
         skymap_urls = [x[10] for x in params]
         skymap_data = [self.extract_skymap_params(url) for url in skymap_urls]
         # mass
@@ -296,7 +304,18 @@ class GetSuperevents:
 
 
 class Fritz:
-    def __init__(self, eventid, dateid, a90, far, mass, allocation, fritz_token):
+    def __init__(
+        self,
+        eventid,
+        dateid,
+        a90,
+        far,
+        mass,
+        allocation,
+        fritz_token,
+        kowalsi_username,
+        kowalski_password,
+    ):
         self.eventid = eventid
         self.dateid = dateid
         self.a90 = a90
@@ -304,6 +323,8 @@ class Fritz:
         self.mass = mass
         self.allocation = allocation
         self.fritz_token = fritz_token
+        self.kowalski_username = kowalsi_username
+        self.kowalski_password = kowalski_password
 
     def query_fritz_observation_plans(self, allocation, token):
         headers = {"Authorization": f"token {token}"}
@@ -314,7 +335,10 @@ class Fritz:
             json_data = json.loads(json_string)
             return json_data
         else:
-            print(response.status_code)
+            logmessage = (
+                f"Error querying Fritz observation plans: {response.status_code}"
+            )
+            logger.log(logmessage, slack=False)
             return None
 
     # get the statistics for a potential observation plan
@@ -329,16 +353,17 @@ class Fritz:
             if datetime.fromisoformat(dateid) < datetime.fromisoformat(
                 "2024-09-14T00:00:00"
             ):
-                print(f"{eventid} predates trigger")
+                logmessage = f"{eventid} predates trigger"
+                logger.log(logmessage, slack=False)
                 return ["correct", "predates trigger"]
             else:
                 if far < 10 or a90 > 1000 or mass < 60:
-                    print(
-                        f"Event doesnt pass criteria - correct no plan request for {eventid}"
-                    )
+                    logmessage = f"Event doesnt pass criteria - correct no plan request for {eventid}"
+                    logger.log(logmessage, slack=False)
                     return ["correct", "not triggered"]
                 else:
-                    print(f"Error: should have requested plan for {eventid}")
+                    logmessage = f"Error: should have requested plan for {eventid}"
+                    logger.log(logmessage, slack=False)
                     trigger_status = "missed plan request"
                     return ["error", "missed plan request"]
         # now only considering events that have a plan request
@@ -355,10 +380,12 @@ class Fritz:
                 "2024-09-14T00:00:00"
             ):
                 if trigger_status == "triggered":
-                    print(f"{eventid} trigger predating automated trigger")
+                    logmessage = f"{eventid} trigger predating automated trigger"
+                    logger.log(logmessage, slack=False)
                     return ["correct", "non-automated trigger"]
                 else:
-                    print(f"{eventid} predates trigger")
+                    logmessage = f"{eventid} predates trigger"
+                    logger.log(logmessage, slack=False)
                     return ["correct", "predates trigger"]
             # now down to events with plans while the trigger is operational
             else:
@@ -372,7 +399,8 @@ class Fritz:
                         if x["status"] == "submitted to telescope queue"
                     ]
                     if len(plans) != 1:
-                        print(f"Multiple triggers: inspect {eventid}")
+                        logmessage = f"Multiple triggers: inspect {eventid}"
+                        logger.log(logmessage, slack=False)
                         return ["inspect", "multiple triggers"]
                 # the not triggered case
                 else:
@@ -387,12 +415,12 @@ class Fritz:
                     ]
                     if not plans:
                         if far < 10 or a90 > 1000 or mass < 60:
-                            print(
-                                f"requested plan when we shouldnt have but correctly didnt trigger - parameters dont pass criteria {eventid}"
-                            )
+                            logmessage = f"requested plan when we shouldnt have but correctly didnt trigger - parameters dont pass criteria {eventid}"
+                            logger.log(logmessage, slack=False)
                             return ["correct", "not triggered"]
                         else:
-                            print(f"No valid plans found for {eventid}")
+                            logmessage = f"No valid plans found for {eventid}"
+                            logger.log(logmessage, slack=False)
                             return ["error", "no valid plan"]
                 # for non triggered events take the most recent plan as truth, ie if earlier plan passes criteria but later one doesn't go by the later one
                 most_recent_plan = max(plans, key=lambda x: x["modified"])
@@ -401,6 +429,21 @@ class Fritz:
                 total_time = stats[0]["statistics"]["total_time"]
                 probability = stats[0]["statistics"]["probability"]
                 start = stats[0]["statistics"]["start_observation"]
+                # check serendiptious coverage case
+                skymap_name = most_recent_plan["localization"]["localization_name"]
+                frac_observed = SkymapCoverage(
+                    localdateobs=dateid,
+                    localname=skymap_name,
+                    localprob=0.9,
+                    fritz_token=self.fritz_token,
+                    fritz_mode="",  # TODO: add testing fritz api mode?
+                    kowalski_username=self.kowalski_username,
+                    kowalski_password=self.kowalski_password,
+                ).get_coverage_fraction()
+                if frac_observed > 0.9 * probability:
+                    serendipitious_observation = True
+                else:
+                    serendipitious_observation = False
                 # independently get the intended trigger status
                 if (
                     far < 10
@@ -417,25 +460,39 @@ class Fritz:
                     trigger_status == "triggered"
                     and intended_trigger_status == "triggered"
                 ):
-                    print(f"triggered on {eventid}")
+                    logmessage = f"triggered on {eventid}"
+                    logger.log(logmessage, slack=False)
                     return ["correct", "triggered", total_time, probability, start]
                 elif (
                     trigger_status == "triggered"
                     and intended_trigger_status == "not triggered"
                 ):
-                    print(f"Error: bad trigger for {eventid}")
+                    logmessage = f"Error: bad trigger for {eventid}"
+                    logger.log(logmessage, slack=False)
                     return ["error", "bad trigger", total_time, probability, start]
                 elif (
                     trigger_status == "not triggered"
                     and intended_trigger_status == "triggered"
                 ):
-                    print(f"Error: missed trigger for {eventid}")
+                    if serendipitious_observation:
+                        logmessage = (
+                            f"Correct no trigger: serendipitous coverage for {eventid}"
+                        )
+                        logger.log(logmessage, slack=False)
+                        # note here we use dateid in place of plan start time bc we still want to generate future trigger cadence
+                        start_proxy = (
+                            dateid + ".000"
+                        )  # TODO: make cadence func smarter at handling different input formats
+                        return ["correct", "triggered", 0, frac_observed, start_proxy]
+                    logmessage = f"Error: missed trigger for {eventid}"
+                    logger.log(logmessage, slack=False)
                     return ["error", "missed trigger", total_time, probability, start]
                 elif (
                     trigger_status == "not triggered"
                     and intended_trigger_status == "not triggered"
                 ):
-                    print(f"not triggered on {eventid}")
+                    logmessage = f"not triggered on {eventid}"
+                    logger.log(logmessage, slack=False)
                     return ["correct", "not triggered", total_time, probability, start]
 
     def get_trigger_status(self):
@@ -452,11 +509,15 @@ class Fritz:
         error = [(i, x) for i, x in enumerate(trigger_status) if x[0] == "error"]
         correct = [(i, x) for i, x in enumerate(trigger_status) if x[0] == "correct"]
         inspect = [(i, x) for i, x in enumerate(trigger_status) if x[0] == "inspect"]
-        print(f"{len(error)} errors, {len(correct)} correct, {len(inspect)} inspect")
+        logmessage = (
+            f"{len(error)} errors, {len(correct)} correct, {len(inspect)} inspect"
+        )
+        logger.log(logmessage, slack=False)
         for x in error:
             index = x[0]
             event = self.eventid[index]
-            print(f"error: {event}: {x[1][1]}")
+            logmessage = f"error: {event}: {x[1][1]}"
+            logger.log(logmessage, slack=False)
         maunual_edits = {
             "S240921cw": ["correct", "not triggered", 0, 0, ""],  # moon too close ?
             "S241125n": [
@@ -476,9 +537,7 @@ class Fritz:
 
 
 class NewEventsToDict:
-    def __init__(
-        self, params, trigger_status, path_data, observing_run="O4c", testing=False
-    ):
+    def __init__(self, params, trigger_status, path_data, observing_run, testing):
         self.params = params
         self.trigger_status = trigger_status
         self.path_data = path_data
@@ -508,7 +567,7 @@ class NewEventsToDict:
             for x in self.params
         ]
         mass_format = [round(x[22]) for x in self.params]
-        chirp_mass = [x[23] for x in self.params]
+        chirp_mass_format = [int(x[23]) for x in self.params]
         dist_format = [round(x[13] / 10**3, 2) for x in self.params]
         a50_format = [round(x[17]) for x in self.params]
         a90_format = [round(x[16]) for x in self.params]
@@ -518,9 +577,9 @@ class NewEventsToDict:
             for x in self.params
         ]
         trigger = [x[1] for x in self.trigger_status]
-        total_time = [x[2] if len(x) > 2 else "" for x in self.trigger_status]
+        total_time = [int(x[2]) if len(x) > 2 else "" for x in self.trigger_status]
         probability = [
-            round(x[3], 2) if len(x) > 2 else "" for x in self.trigger_status
+            int(round(x[3], 2)) if len(x) > 2 else "" for x in self.trigger_status
         ]
         start = [x[4] if len(x) > 2 else "" for x in self.trigger_status]
         obs_cadence = self.generate_cadence_dates(start)
@@ -533,7 +592,7 @@ class NewEventsToDict:
                 "Distance (Gpc)": dist_format,
                 "FAR (years/FA)": far_format,
                 "Mass (M_sol)": mass_format,
-                "Chirp Mass (left edge)": chirp_mass,
+                "Chirp Mass (left edge)": chirp_mass_format,
                 "gcnids": gcnid,
                 "trigger": trigger,
                 "plan time": total_time,
@@ -589,28 +648,29 @@ class NewEventsToDict:
             ] or key in ["S241210cw", "S241130n", "S241129aa", "S240924a"]:
                 events_dict_add[key]["gw"]["trigger plan"] = {}
                 events_dict_add[key]["gw"]["trigger plan"]["time"] = (
-                    new_events_df.at[key, "plan time"]
+                    int(new_events_df.at[key, "plan time"])
                     if "plan time" in new_events_df.columns
-                    else 0
+                    else None
                 )
                 events_dict_add[key]["gw"]["trigger plan"]["probability"] = (
-                    new_events_df.at[key, "plan probability"]
+                    int(new_events_df.at[key, "plan probability"])
                     if "plan probability" in new_events_df.columns
-                    else 0.0
+                    else None
                 )
                 events_dict_add[key]["gw"]["trigger plan"]["start"] = (
                     new_events_df.at[key, "plan start"]
                     if "plan start" in new_events_df.columns
-                    else ""
+                    else None
                 )
                 events_dict_add[key]["gw"]["trigger plan"]["cadence"] = (
                     new_events_df.at[key, "cadence"]
                     if "cadence" in new_events_df.columns
-                    else ""
+                    else None
                 )
 
         if len(new_events_df) == 0:
-            print("No new events to add")
+            logmessage = "No new events to add"
+            logger.log(logmessage, slack=False)
             return None
 
         if not self.testing:  # save automatically
@@ -619,7 +679,8 @@ class NewEventsToDict:
                 "w",
             ) as file:
                 json.dump(events_dict_add, file)
-            print("New events saved to dictionary.")
+            logmessage = "New events saved to dictionary."
+            logger.log(logmessage, slack=False)
         return new_events_df
 
 
@@ -632,7 +693,7 @@ class KowalskiCrossmatch:
         zmin,
         zmax,
         path_data,
-        observing_run="O4c",
+        observing_run,
         catalogs=["catnorth"],
         mindec=-90,
         contour=90,
@@ -688,7 +749,10 @@ class KowalskiCrossmatch:
         do_crossmatch = [
             key for key, value in events_dict_add.items() if not value["crossmatch"]
         ]
-        print(f"{len(do_crossmatch)} events are missing crossmatch: {do_crossmatch}")
+        logmessage = (
+            f"{len(do_crossmatch)} events are missing crossmatch: {do_crossmatch}"
+        )
+        logger.log(logmessage, slack=False)
         return do_crossmatch
 
     def load_skymap_to_kowalski(
@@ -729,9 +793,8 @@ class KowalskiCrossmatch:
         }
         response_catnorth_localization = kowalski.query(query=query)
         selected_agn = response_catnorth_localization.get("gloria", {}).get("data", [])
-        print(
-            f"{len(selected_agn)} CATNorth AGN found in localization volume for {localization_name}"
-        )
+        logmessage = f"{len(selected_agn)} CATNorth AGN found in localization volume for {localization_name}"
+        logger.log(logmessage, slack=False)
         return selected_agn
 
     def crossmatch_quaia(
@@ -766,9 +829,8 @@ class KowalskiCrossmatch:
         converted_selected_agn = [
             {**entry, "_id": str(entry["_id"])} for entry in selected_agn
         ]
-        print(
-            f"{len(converted_selected_agn)} Quaia AGN found in localization volume for {localization_name}"
-        )
+        logmessage = f"{len(converted_selected_agn)} Quaia AGN found in localization volume for {localization_name}"
+        logger.log(logmessage, slack=False)
         return converted_selected_agn
 
     def delete_skymaps(self, kowalski, dateobs, localization_name, machine):
@@ -809,10 +871,11 @@ class KowalskiCrossmatch:
         prob_sorted, coords_sorted = zip(*paired_sorted)
         return list(coords_sorted)
 
-    def get_crossmatches(self, crossmatch_new=True):
+    def get_crossmatches(self, crossmatch_new_only=True):
         """
         get catnorth and quaia crossmatches
         """
+        # TODO: fix if crossmatch_new logic
         kowalski = self.kowalski
         localization_name = self.localization_name
         skymap_str = self.skymap_str
@@ -823,22 +886,31 @@ class KowalskiCrossmatch:
         mindec = self.mindec
 
         # sort which events to crossmatch
-        if crossmatch_new:
-            ids_to_crossmatch = self.check_events_to_crossmatch()
-        ids_not_in_localization = set(ids_to_crossmatch) - set(localization_name)
-        localization_not_in_ids = set(localization_name) - set(ids_to_crossmatch)
-        if ids_not_in_localization:
-            print(
-                f"these events need crossmatches but data were not provided: {ids_not_in_localization}"
-            )
+        ids_missing_crossmatch = self.check_events_to_crossmatch()
+        ids_to_crossmatch = localization_name
+        ids_missing_crossmatch_not_provided = set(ids_missing_crossmatch) - set(
+            ids_to_crossmatch
+        )
+        ids_provided_already_crossmatched = set(ids_to_crossmatch) - set(
+            ids_missing_crossmatch
+        )
+        if crossmatch_new_only:
             ids_to_crossmatch = [
-                id for id in ids_to_crossmatch if id in localization_name
+                id
+                for id in ids_to_crossmatch
+                if id not in ids_provided_already_crossmatched
             ]
-        if localization_not_in_ids and crossmatch_new:
-            print(
-                f"data for these events were provided, but they were skipped because only new crossmatches were performed: {localization_not_in_ids}"
-            )
-        print(f"Crossmatching {len(ids_to_crossmatch)} events: {ids_to_crossmatch}")
+            if ids_provided_already_crossmatched:
+                logmessage = f"Data provided for these events, but skipped bc already have crossmatches: {ids_provided_already_crossmatched}"
+                logger.log(logmessage, slack=False)
+        if ids_missing_crossmatch_not_provided:
+            logmessage = f"Warning: the following events are missing crossmatch data: {ids_missing_crossmatch_not_provided}"
+            logger.log(logmessage, slack=False)
+
+        logmessage = (
+            f"Crossmatching {len(ids_to_crossmatch)} events: {ids_to_crossmatch}"
+        )
+        logger.log(logmessage, slack=False)
 
         # do crossmatch
         if "catnorth" in self.catalogs:
@@ -890,7 +962,8 @@ class KowalskiCrossmatch:
 
         # save coords for catnorth crossmatch
         if not catnorth:
-            print("No catnorth crossmatch")
+            logmessage = "No catnorth crossmatch"
+            logger.log(logmessage, slack=False)
         else:
             # open saved crossmatch dict
             crossmatch_path = f"{self.path_data}/flare_data/dicts/crossmatch_dict_{self.observing_run}.gz"
@@ -907,9 +980,11 @@ class KowalskiCrossmatch:
             for key, value in crossmatch_dict.items():
                 crossmatch_dict_add[key] = value
                 if key not in crossmatch_dict_add:
-                    print(f"{key} added")
+                    logmessage = f"{key} added"
+                    logger.log(logmessage, slack=False)
                 else:
-                    print(f"{key} replaced previously saved crossmatch")
+                    logmessage = f"{key} replaced previously saved crossmatch"
+                    logger.log(logmessage, slack=False)
             if not self.testing:
                 with gzip.open(crossmatch_path, "wb") as f:
                     f.write(pickle.dumps(crossmatch_dict_add))
@@ -930,7 +1005,8 @@ class KowalskiCrossmatch:
                 if key in events_dict_add:
                     events_dict_add[key]["crossmatch"] = value
                 else:
-                    print(f"{key} not in dictionary")
+                    logmessage = f"{key} not in events dictionary - couldnt add stats"
+                    logger.log(logmessage, slack=False)
             if not self.testing:
                 with open(
                     f"{self.path_data}/flare_data/dicts/events_dict_{self.observing_run}.json",
@@ -942,7 +1018,7 @@ class KowalskiCrossmatch:
 
 
 class PushEventsPublic:
-    def __init__(self, path_data, github_token, observing_run="O4c", testing=False):
+    def __init__(self, path_data, github_token, observing_run, testing=False):
         self.path_data = path_data
         self.github_token = github_token
         self.observing_run = observing_run
@@ -989,10 +1065,10 @@ class PushEventsPublic:
 
         # Create subplots with proportional widths
         fig, (ax1, ax2) = plt.subplots(
-            1,
             2,
-            gridspec_kw={"width_ratios": [fraction_before, fraction_after]},
-            figsize=(11, 3),
+            1,
+            gridspec_kw={"height_ratios": [fraction_before, fraction_after]},
+            figsize=(10, 6),
         )
 
         # Plot points for O4b
@@ -1005,9 +1081,8 @@ class PushEventsPublic:
             edgecolors="darkblue",
             linewidth=1,
         )
-        ax1.set_xlabel("Date", fontsize=18)
         ax1.set_yticks([])
-        ax1.set_title("LIGO O4b", fontsize=16)
+        ax1.set_ylabel("O4b", fontsize=16)
         ax1.set_xticks(df_before_cutoff["GW MJD"])
         ax1.set_xticklabels(
             df_before_cutoff["GW Date"], rotation=45, ha="right", fontsize=12
@@ -1020,9 +1095,9 @@ class PushEventsPublic:
         ax1.tick_params(axis="x", rotation=30)
 
         for i, row in df_before_cutoff.iterrows():
-            if row["Chirp Mass (left edge)"]:
+            if pd.notna(row["Chirp Mass (left edge)"]):
                 ax1.annotate(
-                    f"{row['Chirp Mass (left edge)']}Mchirp",
+                    f"{row['Chirp Mass (left edge)'].strip()}M$_{{c}}$",
                     (row["GW MJD"], 0.1),
                     textcoords="offset points",
                     xytext=(0, -5),
@@ -1047,7 +1122,8 @@ class PushEventsPublic:
             linewidth=1,
         )
         ax2.set_yticks([])
-        ax2.set_title("O4c", fontsize=16)
+        ax2.set_xlabel("Date", fontsize=18)
+        ax2.set_ylabel("O4c", fontsize=16)
         ax2.set_xticks(df_after_cutoff["GW MJD"])
         ax2.set_xticklabels(
             df_after_cutoff["GW Date"], rotation=45, ha="right", fontsize=12
@@ -1060,9 +1136,9 @@ class PushEventsPublic:
         ax2.tick_params(axis="x", rotation=30)
 
         for i, row in df_after_cutoff.iterrows():
-            if row["Chirp Mass (left edge)"]:
+            if pd.notna(row["Chirp Mass (left edge)"]):
                 ax2.annotate(
-                    f"{row['Chirp Mass (left edge)']}Mchirp",
+                    f"{row['Chirp Mass (left edge)'].strip()}M$_{{c}}$",
                     (row["GW MJD"], 0.1),
                     textcoords="offset points",
                     xytext=(0, -5),
@@ -1109,7 +1185,8 @@ class PushEventsPublic:
                 text=True,
             )
             if not result.stdout.strip():
-                print("No changes to commit in the events_summary directory.")
+                logmessage = "No changes to commit in the events_summary directory."
+                logger.log(logmessage, slack=False)
                 return
 
             # Commit changes
@@ -1117,14 +1194,18 @@ class PushEventsPublic:
 
             # Push changes to the remote repository
             subprocess.run(["git", "push", "origin", "main"], check=True)
-            print("Changes pushed to the repository successfully.")
+            logmessage = "Changes pushed to the repository successfully."
+            logger.log(logmessage, slack=False)
 
         except subprocess.CalledProcessError as e:
-            print(f"An error occurred while running a git command: {e}")
+            logmessage = f"An error occurred while running a git command: {e}"
+            logger.log(logmessage, slack=False)
         except ValueError as ve:
-            print(f"Error: {ve}")
+            logmessage = f"Error: {ve}"
+            logger.log(logmessage, slack=False)
         except Exception as ex:
-            print(f"An unexpected error occurred: {ex}")
+            logmessage = f"An unexpected error occurred: {ex}"
+            logger.log(logmessage, slack=False)
 
     def format_and_push(self):
         # get events from multiple runs (we present a single markdown file for trigger and error trigger)
@@ -1230,9 +1311,8 @@ class PushEventsPublic:
         low_area = df_priority[df_priority["90% Area (deg2)"] < 1000]
         highmass_lowarea = pd.merge(high_mass, low_area)
         priority = pd.merge(highmass_lowarea, confident)
-        print(
-            f"{len(priority)} {self.observing_run} events with FAR > 10 and mchirp>22 (mass > 60) and area < 1000 sq deg"
-        )
+        logmessage = f"{len(priority)} {self.observing_run} events with FAR > 10 and mchirp>22 (mass > 60) and area < 1000 sq deg"
+        logger.log(logmessage, slack=False)
         # #manual edits
         priority.loc[priority["GW MJD"] == 60572, "gcnids"] = (
             "[2024-09-19T06:15:59](https://fritz.science/gcn_events/2024-09-19T06:15:59)"
@@ -1272,6 +1352,9 @@ class PushEventsPublic:
         trigger_df["comments"] = ""
         trigger_df.loc[trigger_df["graceids"].str.contains("S241125n"), "comments"] = (
             "Swift/Bat coincident detection"
+        )
+        trigger_df.loc[trigger_df["graceids"].str.contains("S250712cd"), "comments"] = (
+            "serendipitious cov"
         )
 
         # trigger errors
@@ -1339,9 +1422,7 @@ class PushEventsPublic:
 
 
 class PlotSkymap:
-    def __init__(
-        self, gracedbid, path_data, observing_run="O4c", catalog="agn_catnorth"
-    ):
+    def __init__(self, gracedbid, path_data, observing_run, catalog="agn_catnorth"):
         self.gracedbid = gracedbid
         self.path_data = path_data
         self.observing_run = observing_run
@@ -1363,7 +1444,8 @@ class PlotSkymap:
         mocs = [k for k in list(event_files) if "multiorder" in k]
         if not mocs:
             url = "none"
-            print(self.gracedbid)
+            logmessage = f"Couldnt find MOC for {self.gracedbid}"
+            logger.log(logmessage, slack=False)
         else:
             if any("LALInference" in item for item in mocs):
                 mocs = [k for k in mocs if "LALInference" in k]
@@ -1430,7 +1512,7 @@ class PlotSkymap:
 
 
 class VisualizePop:
-    def __init__(self, path_data, observing_run="O4c"):
+    def __init__(self, path_data, observing_run):
         self.path_data = path_data
         self.observing_run = observing_run
 
@@ -1482,9 +1564,11 @@ class VisualizePop:
                 )
                 stacked_heights += counts
             except FileNotFoundError:
-                print(f"File for runid {run} not found. Skipping.")
+                logmessage = f"File for runid {run} not found. Skipping."
+                logger.log(logmessage, slack=False)
             except Exception as e:
-                print(f"Error processing runid {run}: {e}. Skipping.")
+                logmessage = f"Error processing runid {run}: {e}. Skipping."
+                logger.log(logmessage, slack=False)
         plt.title("Significant BBH Mass Distribution", fontsize=20)
         plt.xlabel("Mass (M$_{\\odot}$)", fontsize=18)
         plt.ylabel("Count", fontsize=18)

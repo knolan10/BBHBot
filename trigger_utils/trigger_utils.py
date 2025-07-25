@@ -21,10 +21,15 @@ from email.mime.text import MIMEText
 from ligo.gracedb.rest import GraceDb
 # TODO use either datetime or astropytime
 
+from utils.log import Logger
+
 
 class MyException(Exception):
     pass
 
+
+# set up logger (this one wont send to slack)
+logger = Logger(filename="cadence_utils")
 
 """
 Processing the GCN
@@ -177,14 +182,16 @@ def query_mchirp_gracedb(event, path_data):
 
     for fname in files:
         if "mchirp_source" in fname and fname.endswith(".json"):
-            print(f"Found: {fname}")
+            logmessage = f"Found: {fname}"
+            logger.log(logmessage, slack=False)
             file_data = client.files(event, fname)
             with open(f"{path_data}/mchirp/mchirp_source_{event}.json", "wb") as f:
                 f.write(file_data.read())
             break
 
     if not file_data:
-        print(f"Did not find chirp mass file on Gracedb event page for {event}")
+        logmessage = f"Did not find chirp mass file on Gracedb event page for {event}"
+        logger.log(logmessage, slack=False)
         return None
 
     with open(f"{path_data}/mchirp/mchirp_source_{event}.json", "r") as f:
@@ -222,7 +229,8 @@ def query_fritz_gcn_events(dateobs_id, local_name, token, mode):
                 )
             return gcnevent_id, localization_id[0]
     except MyException as e:
-        print(f"error: {e}")
+        logmessage = f"error: {e}"
+        logger.log(logmessage, slack=False)
         return None
 
 
@@ -315,7 +323,8 @@ def get_plan_stats(gcnevent_id, queuename, token, mode):
         status = [x["status"] for x in json_data["data"]]
         if "submitted to telescope queue" in status:
             past_submission = True
-            print("Already submitted to queue")
+            logmessage = "Already submitted to queue"
+            logger.log(logmessage, slack=False)
         else:
             past_submission = False
 
@@ -342,7 +351,8 @@ def get_plan_stats(gcnevent_id, queuename, token, mode):
         probability = stats[0]["statistics"]["probability"]
         start_observation = stats[0]["statistics"]["start_observation"]
         observation_plan_request_id = generated_plan[0]["id"]
-        print(f"Total time: {total_time}, probability: {probability}")
+        logmessage = f"Total time: {total_time}, probability: {probability}"
+        logger.log(logmessage, slack=False)
         return (
             past_submission,
             total_time,
@@ -352,7 +362,8 @@ def get_plan_stats(gcnevent_id, queuename, token, mode):
         )
 
     except MyException as e:
-        print(f"error: {e}")
+        logmessage = f"error: {e}"
+        logger.log(logmessage, slack=False)
         return None
 
 
@@ -414,8 +425,6 @@ def delete_trigger_ztf(plan_request_id, token, mode):
 class SkymapCoverage:
     def __init__(
         self,
-        startdate,
-        enddate,
         localdateobs,
         localname,
         localprob,
@@ -424,8 +433,6 @@ class SkymapCoverage:
         kowalski_username,
         kowalski_password,
     ):
-        self.startdate = startdate
-        self.enddate = enddate
         self.localdateobs = localdateobs
         self.localname = localname
         self.localprob = localprob
@@ -433,6 +440,8 @@ class SkymapCoverage:
         self.fritz_mode = fritz_mode
         self.kowalski_username = kowalski_username
         self.kowalski_password = kowalski_password
+        self.enddate = Time(self.localdateobs).jd
+        self.startdate = self.enddate - TimeDelta(3, format="jd").value
 
     def connect_Kowalski(self):
         """
@@ -481,9 +490,8 @@ class SkymapCoverage:
 
         response = k.query(query=query, max_n_threads=12).get("default").get("data")
         fields = [x["field"] for x in response]
-        print(
-            f"found {len(fields)} exposures of {len(list(set(fields)))} unique fields between JD {round(self.startdate)} and {round(self.enddate)}"
-        )
+        logmessage = f"found {len(fields)} exposures of {len(list(set(fields)))} unique fields between JD {round(self.startdate)} and {round(self.enddate)}"
+        logger.log(logmessage, slack=False)
         return fields
 
     def get_ztf_fields_skymap(self):
@@ -513,9 +521,8 @@ class SkymapCoverage:
         skymap_observations = [
             field for field in skymap_fields if field in observation_fields
         ]
-        print(
-            f"found {len(skymap_observations)} / {len(skymap_fields)} fields observed in time period"
-        )
+        logmessage = f"found {len(skymap_observations)} / {len(skymap_fields)} fields observed in time period"
+        logger.log(logmessage, slack=False)
         frac_observed = len(skymap_observations) / len(skymap_fields)
         return frac_observed
 
@@ -654,9 +661,11 @@ def send_email(sender_email, sender_password, recipient_emails, subject, body):
 
             server.sendmail(sender_email, recipient, msg.as_string())
 
-        print("Emails sent successfully!")
+        logmessage = "Emails sent successfully!"
+        logger.log(logmessage, slack=False)
     except Exception as e:
-        print(f"Failed to send email: {e}")
+        logmessage = f"Failed to send email: {e}"
+        logger.log(logmessage, slack=False)
     finally:
         # Close the SMTP server connection
         server.quit()

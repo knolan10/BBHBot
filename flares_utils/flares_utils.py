@@ -11,18 +11,27 @@ from astropy.time import Time
 import glob
 from matplotlib import rcParams
 
+from utils.log import Logger
+
+# set up logger (this one wont send to slack)
+logger = Logger(filename="cadence_utils")
+
 rcParams["font.family"] = "Liberation Serif"
 
 
 class FlarePreprocessing:
     def __init__(
-        self, graceid, path_data=None, custom_path_photometry=None, observing_run="O4c"
+        self,
+        graceid,
+        path_data,
+        observing_run,
+        custom_path_photometry=None,
     ):
         self.graceid = graceid
         self.path_data = path_data
+        self.observing_run = observing_run
         self.path_photometry = f"{path_data}/flare_data/ZFPS/"
         self.custom_path_photometry = custom_path_photometry
-        self.observing_run = observing_run
 
     def load_event_lightcurves(self):
         """
@@ -111,7 +120,8 @@ class FlarePreprocessing:
         single_filter_r = [self.get_single_filter("ZTF_r", lc) for lc in df_with_mag]
         single_filter_i = [self.get_single_filter("ZTF_i", lc) for lc in df_with_mag]
         AGN = list(zip(single_filter_g, single_filter_r, single_filter_i, radec))
-        print(f"found {len(AGN)} AGN")
+        logmessage = f"found {len(AGN)} AGN"
+        logger.log(logmessage, slack=False)
         return AGN
 
 
@@ -124,19 +134,19 @@ class RollingWindowStats:
         graceid,
         agn,
         path_data,
+        observing_run,
         window_size_before=50,
         window_size_after=25,
         baseline_years=2,
-        observing_run="O4c",
         dateobs=None,
     ):
         self.graceid = graceid
         self.agn = agn
         self.path_data = path_data
+        self.observing_run = observing_run
         self.window_size_before = window_size_before
         self.window_size_after = window_size_after
         self.baseline_years = baseline_years
-        self.observing_run = observing_run
         self.dateobs = dateobs
 
         # retrieve the event dateobs if it is not provided
@@ -223,19 +233,19 @@ class RollingWindowHeuristic:
         agn,
         rolling_stats,
         path_data,
+        observing_run,
+        testing,
         percent=1,
         k_mad=3,
-        testing=False,
-        observing_run="O4c",
     ):
         self.graceid = graceid
         self.agn = agn
         self.rolling_stats = rolling_stats
         self.path_data = path_data
+        self.observing_run = observing_run
         self.percent = percent
         self.k_mad = k_mad
         self.testing = testing
-        self.observing_run = observing_run
 
     def medians_test(self):
         """
@@ -293,9 +303,10 @@ class RollingWindowHeuristic:
             / len(stats_i[0])
             > self.percent
         ]
-        print(
+        logmessage = (
             f"in g,r,i we find {len(index_g)},{len(index_r)},{len(index_i)} candidates"
         )
+        logger.log(logmessage, slack=False)
         return index_g, index_r, index_i
 
     def flares_across_filters(self, g, r, i):
@@ -304,9 +315,11 @@ class RollingWindowHeuristic:
         return indices of candidates with flares in g and r, and then in g,r,i
         """
         gr = np.intersect1d(g, r)
-        print(f"{len(gr)} AGN have flares in g and r filters")
+        logmessage = f"{len(gr)} AGN have flares in g and r filters"
+        logger.log(logmessage, slack=False)
         gri = np.intersect1d(i, gr)
-        print(f"{len(gri)} AGN have flares in g, r, and i filters")
+        logmessage = f"{len(gri)} AGN have flares in g, r, and i filters"
+        logger.log(logmessage, slack=False)
         return gr, gri
 
     def check_photometry_coverage(self):
@@ -328,24 +341,17 @@ class RollingWindowHeuristic:
             if is_all_nan(i[0][0]) and is_all_nan(i[1][0]) and is_all_nan(i[2][0])
         ]
         number_no_baseline_points = len(no_baseline_points)
-        print(
-            number_no_gw_points,
-            "/",
-            input,
-            "have no observations in any color in 200 day post GW period",
-        )
-        print(
-            number_no_baseline_points,
-            "/",
-            input,
-            "have no observations in any color before the GW detection",
-        )
+        logmessage = f"{number_no_gw_points} / {input} have no observations in any color in 200 day post GW period"
+        logger.log(logmessage, slack=False)
+        logmessage = f"{number_no_baseline_points} / {input} have no observations in any color before the GW detection"
+        logger.log(logmessage, slack=False)
         return number_no_gw_points, number_no_baseline_points
 
-    def get_flares(self):
+    def get_flares(self, custom_filter_name=None):
         g, r, i = self.medians_test()
         unique_index = list(set(g + r + i))
-        print(f"{len(unique_index)} unique flares across all colors")
+        logmessage = f"{len(unique_index)} unique flares across all colors"
+        logger.log(logmessage, slack=False)
         gr, gri = self.flares_across_filters(g, r, i)
         radec = [i[3] for i in self.agn]
         flare_coords_g = [radec[x] for x in g]
@@ -370,12 +376,11 @@ class RollingWindowHeuristic:
             }
         }
 
-        if not self.testing:
-            with open(
-                f"{self.path_data}/flare_data/dicts/events_dict_{self.observing_run}.json",
-                "r",
-            ) as file:
-                events_dict_add = json.load(file)
+        with open(
+            f"{self.path_data}/flare_data/dicts/events_dict_{self.observing_run}.json",
+            "r",
+        ) as file:
+            events_dict_add = json.load(file)
 
         # add new values to flare key without replacing existing values
         for key, value in anomalous_dict.items():
@@ -400,9 +405,14 @@ class RollingWindowHeuristic:
         directory = f"{self.path_data}/flare_data/flares"
         if not self.testing:
             os.makedirs(directory, exist_ok=True)
-            path = f"{directory}/{self.graceid}.json"
+            if custom_filter_name:
+                path = f"{directory}/{self.graceid}_{custom_filter_name}.json"
+            else:
+                path = f"{directory}/{self.graceid}.json"
             with open(path, "w") as json_file:
                 json.dump(data, json_file)
+            logmessage = f"saved flare data for {self.graceid} to {path}"
+            logger.log(logmessage, slack=False)
 
         return g, r, i, gr, gri
 
@@ -416,7 +426,7 @@ class Plotter:
         rolling_stats,
         graceid,
         path_data,
-        observing_run="O4c",
+        observing_run,
         flares_from_graceid=False,
     ):
         self.index_to_plot = index_to_plot
@@ -454,9 +464,8 @@ class Plotter:
                 common_values = set()  # Handle empty list of lists
             # Convert the result back to a list
             selected_flares = list(common_values)
-            print(
-                f"{len(selected_flares)} AGN have flares in {flares_from_graceid} band(s)"
-            )
+            logmessage = f"{len(selected_flares)} AGN have flares in {flares_from_graceid} band(s)"
+            logger.log(logmessage, slack=False)
             # get indices for these flares
             all_AGN_coords = [agn[3] for agn in self.agn]
             flare_indices = [
@@ -573,7 +582,8 @@ class Plotter:
         elif self.color_to_plot == "i":
             i = 2
         else:
-            print("Invalid color")
+            logmessage = "Invalid color"
+            logger.log(logmessage, slack=False)
             return
         curve = agn_indexed[i].copy()
         color = ["#77926f", "#c8aca9", "#cba560"][i]  # Colors for g, r, i filters
@@ -639,8 +649,8 @@ class Plotter:
                     else:
                         self.plot_single(i)
                 except Exception as e:
-                    print(e)
-                    print(i)
+                    logger.log(e, slack=False)
+                    logger.log(i, slack=False)
         elif isinstance(self.index_to_plot, list):
             for i in self.index_to_plot:
                 try:
@@ -649,10 +659,11 @@ class Plotter:
                     else:
                         self.plot_single(i)
                 except Exception as e:
-                    print(e)
-                    print(i)
+                    logger.log(e, slack=False)
+                    logger.log(i, slack=False)
         else:
-            print("Invalid index to plot")
+            logmessage = "Invalid index to plot"
+            logger.log(logmessage, slack=False)
 
 
 class LightcurveProcessorOriginal:

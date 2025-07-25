@@ -3,6 +3,10 @@ from astropy.time import Time, TimeDelta
 import requests
 import json
 from .trigger_utils import update_trigger_log, SkymapCoverage
+from utils.log import Logger
+
+# set up logger (this one wont send to slack)
+logger = Logger(filename="cadence_utils")
 
 
 class MyException(Exception):
@@ -27,15 +31,15 @@ def check_pending_observations(df):
             (int(item.split(",")[0].strip("()")), item.split(",")[1].strip("()"))
             for item in items
         ]
-        print(f"Found {len(items_list)} pending observation for {supereventid}")
+        logmessage = f"Found {len(items_list)} pending observation for {supereventid}"
+        logger.log(logmessage, slack=False)
         current_date = Time.now()
         for item in items_list:
             observation_plan_id, start_observation = item[0], item[1]
             # if it is before the time for observation, don't do anything yet
             if current_date < Time(start_observation):
-                print(
-                    f"Observation of {supereventid} scheduled for {start_observation} - will check tomorrow"
-                )
+                logmessage = f"Observation of {supereventid} scheduled for {start_observation} - will check tomorrow"
+                logger.log(logmessage, slack=False)
                 continue
             # if the current date is within 2 days after start_observation, check if we observed
             time_difference = abs((current_date - Time(start_observation)).jd)
@@ -43,9 +47,8 @@ def check_pending_observations(df):
                 gcnid = row.gcn_id
                 localizationid = row.localization_id
                 dateobs = row.dateobs
-                print(
-                    f"will check status of pending observation for {supereventid} on {start_observation}"
-                )
+                logmessage = f"will check status of pending observation for {supereventid} on {start_observation}"
+                logger.log(logmessage, slack=False)
                 format_item = f"({item[0]},{item[1]})"
                 check_pending.append(
                     [
@@ -108,7 +111,8 @@ def get_plan_prob(gcnevent_id, observation_plan_id, token, mode):
         return probability
 
     except MyException as e:
-        print(f"error: {e}")
+        logmessage = f"error: {e}"
+        logger.log(logmessage, slack=False)
         return None
 
 
@@ -150,9 +154,8 @@ def parse_pending_observation(
                         path_data=path_data,
                         remove_string=True,
                     )
-                    print(
-                        f"We did not sucessfully observe the queued plans for {superevent_id}"
-                    )
+                    logmessage = f"We did not sucessfully observe the queued plans for {superevent_id}"
+                    logger.log(logmessage, slack=False)
                     continue
 
                 # check if executed observation was successful
@@ -175,7 +178,8 @@ def parse_pending_observation(
                 if (
                     frac_observed >= 0.8 * fraction_covered_in_plan
                 ):  # TODO: fix coverage function and remove 0.8*
-                    print(f"Observation of {superevent_id} successful")
+                    logmessage = f"Observation of {superevent_id} successful"
+                    logger.log(logmessage, slack=False)
                     update_trigger_log(
                         superevent_id,
                         "successful_observation",
@@ -191,18 +195,19 @@ def parse_pending_observation(
                         remove_string=True,
                     )
                 elif frac_observed > 0:
-                    print("Observation partially successful - visually inspect")
+                    logmessage = "Observation partially successful - visually inspect"
+                    logger.log(logmessage, slack=False)
                     # TODO: build out this case handling
                 else:
                     retry.append(
                         ["retry", superevent_id, gcnid, localizationid, dateobs]
                     )
-                    print(
-                        f"Trigger not successful for {superevent_id} - retrying for tonight"
-                    )
+                    logmessage = f"Trigger not successful for {superevent_id} - retrying for tonight"
+                    logger.log(logmessage, slack=False)
 
             except MyException as e:
-                print(e)
+                logmessage = f"error: {e}"
+                logger.log(logmessage, slack=False)
                 continue
     return retry
 
@@ -236,5 +241,8 @@ def trigger_on_cadence(path_data):
                 trigger.append(
                     ["followup", supereventid, gcnid, localizationid, dateobs]
                 )
-                print(f"Found follow-up trigger: {supereventid} on {cadence_date}")
+                logmessage = (
+                    f"Found follow-up trigger: {supereventid} on {cadence_date}"
+                )
+                logger.log(logmessage, slack=False)
     return trigger

@@ -29,10 +29,16 @@ from trigger_utils.trigger_utils import (
 )
 from utils.log import Logger
 
+# settings for the trigger bot
+from utils.parser import trigger_parser_args
+
+args = trigger_parser_args()
+testing = args.testing
+path_data = args.path_data
+
+# tokens passwords etc.
 with open("config/Credentials.yaml", "r") as file:
     credentials = yaml.safe_load(file)
-testing = credentials["testing"]
-path_data = credentials["path_data"]
 kowalskiusername = credentials["kowalski_username"]
 kowalskipassword = credentials["kowalski_password"]
 
@@ -95,7 +101,8 @@ while True:
     try:
         for message in consumer.consume(timeout=1.0):
             if message.value() is None:
-                print("No message received")
+                logmessage = "No message received"
+                logger.log(logmessage, slack=False)
                 continue
             try:
                 value = message.value()
@@ -304,11 +311,7 @@ while True:
 
                 # check if ZTF survey naturally covered the skymap previous ~3 nights
                 # TODO: require g and r separately
-                enddate = Time(dateobs).jd
-                startdate = enddate - TimeDelta(3, format="jd").value
                 frac_observed = SkymapCoverage(
-                    startdate,
-                    enddate,
                     dateobs,
                     skymap_name,
                     localprob=0.9,
@@ -320,13 +323,13 @@ while True:
                 if (
                     frac_observed >= 0.9 * probability
                 ):  # TODO: what percentage do we want here? Either way, make sure it is documented
-                    logmessage = f"There is recent coverage of {round(frac_observed * 100)} % of {superevent_id} - not triggering"
-                    logger.log(logmessage)
                     serendipitious_observation = (
                         observation_plan_request_id,
                         start_observation,
                     )
-                    message = f"Skipped ZTF triggered for {superevent_id} due to serendipitous coverage"
+                    logmessage = f"There is recent coverage of {round(frac_observed * 100)} % of {superevent_id} - not triggering"
+                    logger.log(logmessage)
+
                 else:
                     if testing:
                         logmessage = f"Plan for {superevent_id} is good - but dont trigger in testing mode"

@@ -1,3 +1,6 @@
+import yaml
+from astropy.time import Time
+
 from flares_utils.new_events_utils import (
     GetSuperevents,
     Fritz,
@@ -17,20 +20,22 @@ from flares_utils.flares_utils import (
     RollingWindowHeuristic,
 )
 from utils.log import Logger
-import yaml
-from astropy.time import Time
+from utils.parser import followup_parser_args
 
 
 class MyException(Exception):
     pass
 
 
-# settings / credentials
+# settings for flares bot
+args = followup_parser_args()
+testing = args.testing
+path_data = args.path_data
+observing_run = args.observing_run
+
+# credentials
 with open("config/Credentials.yaml", "r") as file:
     credentials = yaml.safe_load(file)
-testing = credentials["testing"]
-path_data = credentials["path_data"]
-observing_run = credentials["observing_run"]
 zfps_email = credentials["zfps_email"]
 zfps_userpass = credentials["zfps_userpass"]
 zfps_auth_username = credentials["zfps_auth"]["username"]
@@ -147,7 +152,15 @@ dateid = [x[12] for x in params]
 a90 = [x[16] for x in params]
 mass = [x[22] for x in params]
 trigger_status = Fritz(
-    eventid, dateid, a90, far, mass, allocation, fritz_token
+    eventid,
+    dateid,
+    a90,
+    far,
+    mass,
+    allocation,
+    fritz_token,
+    kowalski_username,
+    kowalski_password,
 ).get_trigger_status()
 
 # save the new events to dictionary
@@ -166,6 +179,7 @@ crossmatch = KowalskiCrossmatch(
     zmin,
     zmax,
     path_data,
+    observing_run,
     testing=testing,
     kowalski_username=kowalski_username,
     kowalski_password=kowalski_password,
@@ -282,6 +296,7 @@ for x in waiting_for_photometry:
         path_data=path_data,
         submission_date=date_submitted,
         num_batches_submitted=num_batches,
+        observing_run=observing_run,
         testing=testing,
         email=zfps_email,
         userpass=zfps_userpass,
@@ -318,8 +333,8 @@ for id in check_for_flares:
         agn=AGN,
         rolling_stats=rolling_stats,
         path_data=path_data,
+        observing_run=observing_run,
         percent=0.6,
         k_mad=3,
         testing=testing,
-        observing_run=observing_run,
     ).get_flares()

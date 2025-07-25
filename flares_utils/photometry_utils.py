@@ -13,13 +13,18 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import math
 
+from utils.log import Logger
+
+# set up logger (this one wont send to slack)
+logger = Logger(filename="cadence_utils")
+
 
 class MyException(Exception):
     pass
 
 
 class PhotometryStatus:
-    def __init__(self, observing_run="O4c", path_data=None):
+    def __init__(self, observing_run, path_data=None):
         self.observing_run = observing_run
         self.path_data = path_data
 
@@ -31,8 +36,8 @@ class PhotometryStatus:
             ) as file:
                 events_dict = json.load(file)
         except MyException as e:
-            print("observing_run must be O4a, O4b, or O4c")
-            print(e)
+            logmessage = f"observing_run must be O4a, O4b, or O4c: {e}"
+            logger.log(logmessage, slack=False)
             return
         # TODO: automate.. add trigger key to events_dict
         trigger_list = [
@@ -50,9 +55,8 @@ class PhotometryStatus:
             and value["gw"]["90% Area (deg2)"] < 1000
             and value["gw"]["FAR (years/FA)"] > 10
         ]
-        print(
-            f"{len(events_dict) - len(good_events)} / {len(events_dict)} events in {self.observing_run} are not priority"
-        )
+        logmessage = f"{len(events_dict) - len(good_events)} / {len(events_dict)} events in {self.observing_run} are not priority"
+        logger.log(logmessage, slack=False)
         good_events_dict = {
             key: events_dict[key] for key in good_events if key in events_dict
         }
@@ -144,9 +148,8 @@ class PhotometryCoords:
         gw_jd = events_dict[self.graceid]["gw"]["GW MJD"] + 2400000.5
         two_year_baseline = gw_jd - 365 * 2
         if self.action == "all":
-            print(
-                f"about {len(ztf_coords)} / {len(all_coords)} coords should be in ZTF footprint"
-            )
+            logmessage = f"about {len(ztf_coords)} / {len(all_coords)} coords should be in ZTF footprint"
+            logger.log(logmessage, slack=False)
             return ztf_coords, two_year_baseline
         names = [str(x["ra"]) + "_" + str(x["dec"]) for x in ztf_coords]
         path = self.path_photometry  # path to where photometry is stored locally
@@ -156,25 +159,27 @@ class PhotometryCoords:
                 for coords, name in zip(ztf_coords, names)
                 if not os.path.exists(path + name + ".gz")
             ]
-            print(
-                f"{len(new_coords)} / {len(all_coords)} total coords dont have photometry"
-            )
+            logmessage = f"{len(new_coords)} / {len(all_coords)} total coords dont have photometry"
+            logger.log(logmessage, slack=False)
             return new_coords, two_year_baseline
         if self.action == "update":
             if events_dict[self.graceid]["flare"]:
                 date_zfps = events_dict[self.graceid]["flare"]["date_last_zfps"]
-                print(f"last photometry request for {self.graceid} was on {date_zfps}")
+                logmessage = (
+                    f"last photometry request for {self.graceid} was on {date_zfps}"
+                )
+                logger.log(logmessage, slack=False)
             else:
-                print(f"Error: no photometry for {self.graceid}")
+                logmessage = f"Error: no photometry for {self.graceid}"
+                logger.log(logmessage, slack=False)
                 return
             existing_coords = [
                 coords
                 for coords, name in zip(ztf_coords, names)
                 if os.path.exists(path + name + ".gz")
             ]
-            print(
-                f"Found saved photometry for {len(existing_coords)} / {len(all_coords)} coords crossmatched"
-            )
+            logmessage = f"Found saved photometry for {len(existing_coords)} / {len(all_coords)} coords crossmatched"
+            logger.log(logmessage, slack=False)
             # if the df is empty, get two year baseline
             existing_photometry = [
                 pd.read_pickle(path + file + ".gz", compression="gzip")
@@ -194,13 +199,16 @@ class PhotometryCoords:
             ]
             num_invalid = len(latest_dates) - len(filtered_coords)
             if num_invalid > 0:
-                print(
-                    f"{num_invalid} coords have photometry within a week or are outside 200 days post GW"
-                )
+                logmessage = f"{num_invalid} coords have photometry within a week or are outside 200 days post GW"
+                logger.log(logmessage, slack=False)
             elif len(filtered_coords) == 0:
-                print("No coords valid for update photometry")
+                logmessage = "No coords valid for update photometry"
+                logger.log(logmessage, slack=False)
             else:
-                print(f"{len(filtered_coords)} coords are valid for update photometry")
+                logmessage = (
+                    f"{len(filtered_coords)} coords are valid for update photometry"
+                )
+                logger.log(logmessage, slack=False)
             # convert mjd to jd
             dates = [
                 date
@@ -239,9 +247,8 @@ class PhotometryCoords:
             grouped_dates.append(current_group_dates)
             grouped_coords.append(current_group_coords)
         single_dates = [min(group) for group in grouped_dates]
-        print(
-            f"After batching dates with window size {threshold}, created {len(single_dates)} batches"
-        )
+        logmessage = f"After batching dates with window size {threshold}, created {len(single_dates)} batches"
+        logger.log(logmessage, slack=False)
         return single_dates, grouped_coords
 
     @staticmethod
@@ -271,7 +278,8 @@ class PhotometryCoords:
         ra = [val["ra"] for val in coords]
         dec = [val["dec"] for val in coords]
         if len(coords) == 0:
-            print("no AGN to submit")
+            logmessage = "no AGN to submit"
+            logger.log(logmessage, slack=False)
             events_dict[self.graceid]["flare"] = {
                 "date_last_zfps": "no AGN observable by ZTF"
             }
@@ -286,7 +294,8 @@ class PhotometryCoords:
             declist = [dec[i : i + 1500] for i in range(0, len(dec), 1500)]
             if self.action == "update":
                 date = [date] * len(ralist)
-            print(f"Submit in {len(ralist)} batches")
+            logmessage = f"Submit in {len(ralist)} batches"
+            logger.log(logmessage, slack=False)
             return ralist, declist, date
 
     def replace_scientific_notation(self, ra_list, dec_list):
@@ -306,10 +315,10 @@ class PhotometryCoords:
                     if is_scientific_notation(num)
                 ]
                 if len(sci) > 0:
-                    print(f"Found sci: {sci}")
-                    print(
-                        "If there is a number in scientific notation that shouldn't be rounded to zero, need to address manually"
-                    )
+                    logmessage = f"Found sci: {sci}"
+                    logger.log(
+                        logmessage, slack=False
+                    )  # If there is a number in scientific notation that shouldn't be rounded to zero, need to address manually"
                 return [
                     [0 if is_scientific_notation(num) else num for num in sublist]
                     for sublist in lst
@@ -317,7 +326,10 @@ class PhotometryCoords:
             else:
                 sci = [num for num in lst if is_scientific_notation(num)]
                 if len(sci) > 0:
-                    print(f"Found sci: {sci}")
+                    logmessage = f"Found sci: {sci}"
+                    logger.log(
+                        logmessage, slack=False
+                    )  # If there is a number in scientific notation that shouldn't be rounded to zero, need to address manually
                 return [0 if is_scientific_notation(num) else num for num in lst]
 
         ra_list = process_list(ra_list)
@@ -343,9 +355,8 @@ class PhotometryCoords:
                 for sublist in jd_unflattened
                 for item in (sublist if isinstance(sublist, list) else [sublist])
             ]
-            print(
-                f"After batching for ZFPS, retrieved {len(date)} objects in {len(jd)} batches"
-            )
+            logmessage = f"After batching for ZFPS, retrieved {len(date)} objects in {len(jd)} batches"
+            logger.log(logmessage, slack=False)
         else:
             ra, dec, jd = self.format_for_zfps(coords, date)
             jd = [jd] * len(ra)
@@ -369,7 +380,8 @@ class PhotometryCoords:
             # to submit now
             ra, dec, jd = ra[:10], dec[:10], jd[:10]
             num_agn = sum([len(x) for x in ra])
-            print(f"Retrieved {num_agn} AGN for submission now")
+            logmessage = f"Retrieved {num_agn} AGN for submission now"
+            logger.log(logmessage, slack=False)
 
         return ra, dec, jd, num_agn
 
@@ -390,7 +402,8 @@ class PhotometryCoords:
             "number_to_submit": number_to_submit,
             "action": self.action,
         }
-        print(f"Saving {len(ra)} queued photometry to {file_path}")
+        logmessage = f"Saving {len(ra)} queued photometry to {file_path}"
+        logger.log(logmessage, slack=False)
         with open(file_path, "w") as file:
             json.dump(data, file, indent=4)
 
@@ -430,9 +443,11 @@ class PhotometryCoords:
         destination_path = os.path.join(path_complete_queued_photometry, file_name)
         if os.path.exists(source_path):
             os.rename(source_path, destination_path)
-            print(f"Moved {file_name} to {path_complete_queued_photometry}")
+            logmessage = f"Moved {file_name} to {path_complete_queued_photometry}"
+            logger.log(logmessage, slack=False)
         else:
-            print(f"{file_name} not found in {path_queued_photometry}")
+            logmessage = f"{file_name} not found in {path_queued_photometry}"
+            logger.log(logmessage, slack=False)
 
 
 class GetPhotometry:
@@ -446,8 +461,8 @@ class GetPhotometry:
         auth_password,
         email,
         userpass,
-        observing_run="O4c",
-        path_data="data",
+        observing_run,
+        path_data,
         testing=True,
     ):
         self.ra = ra
@@ -481,9 +496,11 @@ class GetPhotometry:
             url, auth=(self.auth_username, self.auth_password), data=payload
         )
         if r.status_code == 200:
-            print("Success")
+            logmessage = "Success"
+            logger.log(logmessage, slack=False)
         else:
-            print(f"Error: {r.text}")
+            logmessage = f"Error: {r.text}"
+            logger.log(logmessage, slack=False)
 
     def save_photometry_date(self):
         photometry_date = None
@@ -509,20 +526,24 @@ class GetPhotometry:
                     ) as file:
                         json.dump(events_dict, file)
             else:
-                print(f"{key} not in dictionary")
+                logmessage = f"{key} not in dictionary"
+                logger.log(logmessage, slack=False)
         return photometry_date
 
     def submit(self):
         if len(self.ra) == 0:
-            print("no AGN to submit")
+            logmessage = "no AGN to submit"
+            logger.log(logmessage, slack=False)
             return None, None, None
         elif any(isinstance(item, list) for item in self.ra):
             num_batches = len(self.ra)
             num_agn = sum([len(x) for x in self.ra])
             if self.testing:
-                print("Testing mode - no submission")
+                logmessage = "Testing mode - no submission"
+                logger.log(logmessage, slack=False)
             else:
-                print(f"submit in {num_batches} batches")
+                logmessage = f"submit in {num_batches} batches"
+                logger.log(logmessage, slack=False)
                 [
                     self.submit_post(r, d, j)
                     for r, d, j in zip(self.ra, self.dec, self.jd)
@@ -531,12 +552,17 @@ class GetPhotometry:
             num_batches = 1
             num_agn = len(self.ra)
             if self.testing:
-                print("Testing mode - no submission")
+                logmessage = "Testing mode - no submission"
+                logger.log(logmessage, slack=False)
             else:
-                print("submit in one batch")
+                logmessage = "submit in one batch"
+                logger.log(logmessage, slack=False)
                 self.submit_post(self.ra, self.dec, self.jd)
         photometry_date = self.save_photometry_date()
-        print(f"Submitted {num_agn} AGN in {num_batches} batches at {photometry_date}")
+        logmessage = (
+            f"Submitted {num_agn} AGN in {num_batches} batches at {photometry_date}"
+        )
+        logger.log(logmessage, slack=False)
         return photometry_date, num_agn, num_batches
 
 
@@ -552,7 +578,7 @@ class SavePhotometry:
         batch_codes=None,
         submission_date=None,
         num_batches_submitted=None,
-        observing_run="O4c",
+        observing_run=None,
         testing=False,
         email=None,
         userpass=None,
@@ -576,6 +602,7 @@ class SavePhotometry:
     def get_coords_batchcode(self):
         """
         load zfps table, get coords, format filename given a manually input batch code
+        Reminder: provide in list like this: ['/12552/', '/12551/']
         """
         action = "Query Database"
         settings = {
@@ -590,16 +617,15 @@ class SavePhotometry:
             url, auth=(self.auth_username, self.auth_password), params=settings
         )
         if r.status_code == 200:
-            print(
-                "Script executed normally and queried the ZTF Batch Forced Photometry database.\n"
-            )
+            logmessage = "Script executed normally and queried the ZTF Batch Forced Photometry database.\n"
+            logger.log(logmessage, slack=False)
             html_content = StringIO(r.text)
             full_table = pd.read_html(html_content)[0]
             pattern = "|".join(self.batch_codes)
             table_gw = full_table[
                 full_table["lightcurve"].str.contains(pattern, na=False)
             ]
-            print(f"{len(table_gw)} coords found")
+            logmessage = f"{len(table_gw)} coords found"
             ra = table_gw["ra"].tolist()
             dec = table_gw["dec"].tolist()
             name = [str(r) + "_" + str(d) for r, d in zip(ra, dec)]
@@ -629,12 +655,12 @@ class SavePhotometry:
             url, auth=(self.auth_username, self.auth_password), params=settings
         )
         if r.status_code != 200:
-            print(f"Error: {r.status_code} - {r.text}")
+            logmessage = f"Error: {r.status_code} - {r.text}"
+            logger.log(logmessage, slack=False)
             return None
 
-        print(
-            "Script executed normally and queried the ZTF Batch Forced Photometry database.\n"
-        )
+        logmessage = "Script executed normally and queried the ZTF Batch Forced Photometry database.\n"
+        logger.log(logmessage, slack=False)
         html_content = StringIO(r.text)
         full_table = pd.read_html(html_content)[0]
 
@@ -684,12 +710,15 @@ class SavePhotometry:
         )
         filtered_table = filtered_table[filtered_table["matches_date"]]
         filtered_table = filtered_table.drop(columns=["matches_date"])
-        print(f"{len(filtered_table)} coords found")
+        logmessage = f"{len(filtered_table)} coords found"
+        logger.log(logmessage, slack=False)
 
         # check if we retrieved the same number of batches as submitted, if not, likely not complete yet
         # this breaks for codes>6digits
         def extract_batch_code(lightcurve):
             try:
+                if not isinstance(lightcurve, str):
+                    return None
                 match = re.search(r"/(\d{5})/", lightcurve)
                 if match:
                     return match.group(1)
@@ -698,7 +727,8 @@ class SavePhotometry:
                     return match.group(1)
                 return None
             except MyException as e:
-                print(f"Error: {e}")
+                logmessage = f"Error: {e}"
+                logger.log(logmessage, slack=False)
                 return None
 
         filtered_table["batch_code"] = filtered_table["lightcurve"].apply(
@@ -706,9 +736,8 @@ class SavePhotometry:
         )
         num_batches_received = filtered_table["batch_code"].nunique()
         batches_received = filtered_table["batch_code"].unique()
-        print(
-            f"Returned {num_batches_received} batches for {self.num_batches_submitted} submitted"
-        )
+        logmessage = f"Returned {num_batches_received} batches for {self.num_batches_submitted} submitted"
+        logger.log(logmessage, slack=False)
         if num_batches_received != self.num_batches_submitted:
             return None
 
@@ -735,23 +764,20 @@ class SavePhotometry:
             url, auth=(self.auth_username, self.auth_password), params=settings
         )
         if r.status_code == 200:
-            print(
-                "Script executed normally and queried the ZTF Batch Forced Photometry database.\n"
-            )
+            logmessage = "Script executed normally and queried the ZTF Batch Forced Photometry database.\n"
+            logger.log(logmessage, slack=False)
             url_prefix = "https://ztfweb.ipac.caltech.edu"
             lightcurves = re.findall(r"/ztf/ops.+?lc.txt\b", r.text)
             if lightcurves is not None:
                 batch_url = [url_prefix + lc for lc in lightcurves]
             else:
-                print(
-                    "Status_code=",
-                    r.status_code,
-                    "; Jobs either queued or abnormal execution.",
-                )
+                logmessage = f"Status_code={r.status_code}"
+                logger.log(logmessage, slack=False)
         batch_lightcurves = [
             lc for lc in batch_url if any(batch in lc for batch in self.batch_codes)
         ]
-        print("Retrieved", len(batch_lightcurves), "lightcurves")
+        logmessage = f"Retrieved {len(batch_lightcurves)} lightcurves"
+        logger.log(logmessage, slack=False)
         return batch_lightcurves
 
     def df_from_url(self, url, file):
@@ -836,7 +862,8 @@ class SavePhotometry:
         errors = [x for x in result if x is None]
         num_errors = len(errors)
         values = [x for x in result if x is not None]
-        print(f"{num_errors} broken urls; {len(values)} lightcurves returned")
+        logmessage = f"{num_errors} broken urls; {len(values)} lightcurves returned"
+        logger.log(logmessage, slack=False)
         lc_from_url, filename_updated = zip(*values)
         lc_cut = [self.quality_cut_filter(df) for df in lc_from_url]
         # if the photometry is an update to existing photometry, open existing df and append
@@ -844,16 +871,16 @@ class SavePhotometry:
             batch_photometry_existing, radec_existing = self.load_event_lightcurves(
                 filename_updated
             )
-            print(
-                f"loaded {len(batch_photometry_existing)} existing AGN photometry for {len(lc_cut)} new AGN photometry"
-            )
+            logmessage = f"loaded {len(batch_photometry_existing)} existing AGN photometry for {len(lc_cut)} new AGN photometry"
+            logger.log(logmessage, slack=False)
             for i in range(len(batch_photometry_existing)):
                 batch_photometry_existing[i] = pd.concat(
                     [batch_photometry_existing[i], lc_cut[i]]
                 ).drop_duplicates()
             if len(batch_photometry_existing) == len(filename_updated):
                 if self.testing:
-                    print("Testing mode - no download")
+                    logmessage = "Testing mode - no download"
+                    logger.log(logmessage, slack=False)
                 else:
                     [
                         self.download_lightcurves(i, j)
@@ -861,13 +888,15 @@ class SavePhotometry:
                     ]
                 num_returned = len(batch_photometry_existing)
             else:
-                print("Error: different number of lightcurves and filenames")
+                logmessage = "Error: different number of lightcurves and filenames"
+                logger.log(logmessage, slack=False)
                 return None
         # save the new photometry
         else:
             if len(lc_cut) == len(filename_updated):
                 if self.testing:
-                    print("Testing mode - no download")
+                    logmessage = "Testing mode - no download"
+                    logger.log(logmessage, slack=False)
                 else:
                     [
                         self.download_lightcurves(i, j)
@@ -875,10 +904,12 @@ class SavePhotometry:
                     ]
                 num_returned = len(lc_cut)
             else:
-                print("Error: different number of lightcurves and filenames")
+                logmessage = "Error: different number of lightcurves and filenames"
+                logger.log(logmessage, slack=False)
                 return None
 
-        print(f"downloaded {num_returned} lightcurves")
+        logmessage = f"downloaded {num_returned} lightcurves"
+        logger.log(logmessage, slack=False)
         return self.batch_codes, num_returned, num_errors
 
 
@@ -923,7 +954,8 @@ class PhotometryLog:
             dateobs = self.photometry_pipeline["events"][id]["dateobs"]
             if (Time.now() - Time(dateobs, format="isot")).value > 200:
                 self.photometry_pipeline["events"][id]["over_200_days"] = True
-                print(f"Event {id} is over 200 days old")
+                logmessage = f"Event {id} is over 200 days old"
+                logger.log(logmessage, slack=False)
                 with open(self.path_pipeline, "w") as file:
                     json.dump(self.photometry_pipeline, file, indent=4)
 
@@ -972,25 +1004,27 @@ class PhotometryLog:
             url, auth=(self.auth_username, self.auth_password), params=settings
         )
         if r.status_code == 200:
-            print(
-                "Script executed normally and queried the ZTF Batch Forced Photometry database.\n"
-            )
+            logmessage = "Script executed normally and queried the ZTF Batch Forced Photometry database.\n"
+            logger.log(logmessage, slack=False)
             html_content = StringIO(r.text)
             if "Zero records returned" in r.text:
                 num_pending = 0
             else:
                 full_table = pd.read_html(html_content)[0]
                 num_pending = full_table.shape[0]
-            print(f"Number of pending requests: {num_pending}")
+            logmessage = f"Number of pending requests: {num_pending}"
+            logger.log(logmessage, slack=False)
             return num_pending
         elif (
             r.status_code == 400
         ):  # unfortunately returns this error code when there are 0 pending jobs, so assume this is the case
-            print("No pending jobs")
+            logmessage = "No pending jobs"
+            logger.log(logmessage, slack=False)
             num_pending = 0
             return num_pending
         else:
-            print(f"Error: {r.status_code}")
+            logmessage = f"Error: {r.status_code}"
+            logger.log(logmessage, slack=False)
             return None
 
     def add_event(self, event_id, event_data):
@@ -999,7 +1033,6 @@ class PhotometryLog:
         """
         if event_id not in self.photometry_pipeline["events"]:
             self.photometry_pipeline["events"][event_id] = event_data
-            print(event_data)
             try:
                 if isinstance(event_data["zfps"][0], str):
                     num_agn = 0
@@ -1012,9 +1045,13 @@ class PhotometryLog:
             )
             with open(self.path_pipeline, "w") as file:
                 json.dump(self.photometry_pipeline, file, indent=4)
-            print(f"Event ID {event_id} added successfully.")
+            logmessage = f"Event ID {event_id} added successfully."
+            logger.log(logmessage, slack=False)
         else:
-            print(f"Event ID {event_id} already exists in the photometry pipeline.")
+            logmessage = (
+                f"Event ID {event_id} already exists in the photometry pipeline."
+            )
+            logger.log(logmessage, slack=False)
 
     def add_zfps_entry(self, event_id, new_entry):
         """
@@ -1030,9 +1067,11 @@ class PhotometryLog:
             )
             with open(self.path_pipeline, "w") as file:
                 json.dump(self.photometry_pipeline, file, indent=4)
-            print(f"New ZFPS added to {event_id}.")
+            logmessage = f"New ZFPS added to {event_id}."
+            logger.log(logmessage, slack=False)
         else:
-            print(f"Event ID {event_id} not found in the photometry pipeline.")
+            logmessage = f"Event ID {event_id} not found in the photometry pipeline."
+            logger.log(logmessage, slack=False)
 
     def check_photometry_status(self):
         """
@@ -1086,8 +1125,12 @@ class PhotometryLog:
                 for t, z in zip(time_delta_thresholds, num_requests_should_be_made)
             ):
                 needs_photometry_request.append([id, dateobs, "update"])
-        print(f"Waiting for photometry: {[x[0] for x in waiting_for_photometry]}")
-        print(f"Needs photometry request: {[x[0] for x in needs_photometry_request]}")
+        logmessage = f"Waiting for photometry: {[x[0] for x in waiting_for_photometry]}"
+        logger.log(logmessage, slack=False)
+        logmessage = (
+            f"Needs photometry request: {[x[0] for x in needs_photometry_request]}"
+        )
+        logger.log(logmessage, slack=False)
         return needs_photometry_request, waiting_for_photometry
 
     def update_photometry_complete(
@@ -1113,11 +1156,14 @@ class PhotometryLog:
                     # save
                     with open(self.path_pipeline, "w") as file:
                         json.dump(self.photometry_pipeline, file, indent=4)
-                    print(f"Photometry status updated for {event_id}.")
+                    logmessage = f"Photometry status updated for {event_id}."
+                    logger.log(logmessage, slack=False)
                     return
-            print(f"Submission date {submission_date} not found for {event_id}.")
+            logmessage = f"Submission date {submission_date} not found for {event_id}."
+            logger.log(logmessage, slack=False)
         else:
-            print(f"Event ID {event_id} not found in the photometry pipeline.")
+            logmessage = f"Event ID {event_id} not found in the photometry pipeline."
+            logger.log(logmessage, slack=False)
 
 
 class PlotPhotometry:
@@ -1156,9 +1202,8 @@ class PlotPhotometry:
             events_dict = json.load(file)
         total_matches = events_dict[self.graceid]["crossmatch"]["n_agn_catnorth"]
         dateobs = events_dict[self.graceid]["gw"]["GW MJD"] + 2400000.5
-        print(
-            f"{len(empty)} / {len(batch_photometry_filtered)} dataframes for {total_matches} Catnorth sources are empty"
-        )
+        logmessage = f"{len(empty)} / {len(batch_photometry_filtered)} dataframes for {total_matches} Catnorth sources are empty"
+        logger.log(logmessage, slack=False)
         jd_min = [x["jd"].min() for x in batch_photometry_filtered]
         jd_max = [x["jd"].max() for x in batch_photometry_filtered]
         # Create a DataFrame for plotting

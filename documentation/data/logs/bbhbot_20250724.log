@@ -1,0 +1,107 @@
+20250724_22:36:23: Script executed normally and queried the ZTF Batch Forced Photometry database.
+
+20250724_22:39:14: Script executed normally and queried the ZTF Batch Forced Photometry database.
+
+20250724_22:39:32: Script executed normally and queried the ZTF Batch Forced Photometry database.
+
+20250724_22:39:40: 4458 coords found
+20250724_22:57:20: Script executed normally and queried the ZTF Batch Forced Photometry database.
+
+20250724_22:57:28: 4458 coords found
+20250724_23:01:38: Error: 400 - <!DOCTYPE html
+	PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+	 "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en-US" xml:lang="en-US">
+<head>
+<title>Status of Requests Submitted For ZTF Batch Forced-Photometry Service</title>
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" />
+</head>
+<body bgcolor="#87c4ee">
+Error: database is busy; try again a minute later.
+<br /><br />
+</body>
+</html>
+20250724_23:03:05: Script executed normally and queried the ZTF Batch Forced Photometry database.
+
+20250724_23:03:14: 4569 coords found
+20250724_23:03:14: Returned 5 batches for 4 submitted
+20250724_23:03:51: Script executed normally and queried the ZTF Batch Forced Photometry database.
+
+20250724_23:04:00: 4569 coords found
+20250724_23:04:00: Returned 5 batches for 4 submitted
+20250724_23:07:32: Script executed normally and queried the ZTF Batch Forced Photometry database.
+
+20250724_23:07:37: Script executed normally and queried the ZTF Batch Forced Photometry database.
+
+20250724_23:07:37: ('Retrieved', 4505, 'lightcurves')
+20250724_23:15:21: 61 broken urls; 4444 lightcurves returned
+20250724_23:16:08: downloaded 4444 lightcurves
+20250724_23:19:05: Script executed normally and queried the ZTF Batch Forced Photometry database.
+
+20250724_23:19:10: 2218 coords found
+20250724_23:19:10: Returned 3 batches for 4 submitted
+20250724_23:19:49: Script executed normally and queried the ZTF Batch Forced Photometry database.
+
+20250724_23:19:54: Script executed normally and queried the ZTF Batch Forced Photometry database.
+
+20250724_23:19:54: ('Retrieved', 2154, 'lightcurves')
+20250724_23:23:43: 50 broken urls; 2104 lightcurves returned
+20250724_23:24:06: downloaded 2104 lightcurves
+20250724_23:28:57: found 4454 AGN
+20250724_23:37:20: in g,r,i we find 1566,1602,1343 candidates
+20250724_23:37:20: 2431 unique flares across all colors
+20250724_23:37:20: 1101 AGN have flares in g and r filters
+20250724_23:37:20: 672 AGN have flares in g, r, and i filters
+20250724_23:37:20: 404 / 4454 have no observations in any color in 200 day post GW period
+20250724_23:37:20: 249 / 4454 have no observations in any color before the GW detection
+20250724_23:39:12: in g,r,i we find 1566,1602,1343 candidates
+20250724_23:39:12: 2431 unique flares across all colors
+20250724_23:39:12: 1101 AGN have flares in g and r filters
+20250724_23:39:12: 672 AGN have flares in g, r, and i filters
+20250724_23:39:12: 404 / 4454 have no observations in any color in 200 day post GW period
+20250724_23:39:12: 249 / 4454 have no observations in any color before the GW detection
+20250724_23:46:04: in g,r,i we find 1566,1602,1343 candidates
+20250724_23:46:04: 2431 unique flares across all colors
+20250724_23:46:04: 1101 AGN have flares in g and r filters
+20250724_23:46:04: 672 AGN have flares in g, r, and i filters
+20250724_23:46:04: 404 / 4454 have no observations in any color in 200 day post GW period
+20250724_23:46:04: 249 / 4454 have no observations in any color before the GW detection
+20250724_23:46:24: in g,r,i we find 1272,1329,1069 candidates
+20250724_23:46:24: 2070 unique flares across all colors
+20250724_23:46:24: 861 AGN have flares in g and r filters
+20250724_23:46:24: 510 AGN have flares in g, r, and i filters
+20250724_23:46:24: 404 / 4454 have no observations in any color in 200 day post GW period
+20250724_23:46:24: 249 / 4454 have no observations in any color before the GW detection
+20250724_23:46:32: too many values to unpack (expected 1)
+20250724_23:46:32: 30
+20250724_23:47:12: in g,r,i we find 1272,1329,1069 candidates
+20250724_23:47:12: 2070 unique flares across all colors
+20250724_23:47:12: 861 AGN have flares in g and r filters
+20250724_23:47:12: 510 AGN have flares in g, r, and i filters
+20250724_23:47:12: 404 / 4454 have no observations in any color in 200 day post GW period
+20250724_23:47:12: 249 / 4454 have no observations in any color before the GW detection
+20250724_23:47:25: in g,r,i we find 695,667,596 candidates
+20250724_23:47:25: 1208 unique flares across all colors
+20250724_23:47:25: 423 AGN have flares in g and r filters
+20250724_23:47:25: 223 AGN have flares in g, r, and i filters
+20250724_23:47:25: 404 / 4454 have no observations in any color in 200 day post GW period
+20250724_23:47:25: 249 / 4454 have no observations in any color before the GW detection
+20250724_23:48:47: in g,r,i we find 1566,1602,1343 candidates
+20250724_23:48:47: 2431 unique flares across all colors
+20250724_23:48:47: 1101 AGN have flares in g and r filters
+20250724_23:48:47: 672 AGN have flares in g, r, and i filters
+20250724_23:48:47: 404 / 4454 have no observations in any color in 200 day post GW period
+20250724_23:48:47: 249 / 4454 have no observations in any color before the GW detection
+20250724_23:53:47: in g,r,i we find 500,508,403 candidates
+20250724_23:53:47: 898 unique flares across all colors
+20250724_23:53:47: 299 AGN have flares in g and r filters
+20250724_23:53:47: 146 AGN have flares in g, r, and i filters
+20250724_23:53:47: 404 / 4454 have no observations in any color in 200 day post GW period
+20250724_23:53:47: 249 / 4454 have no observations in any color before the GW detection
+20250724_23:55:51: in g,r,i we find 500,508,403 candidates
+20250724_23:55:51: 898 unique flares across all colors
+20250724_23:55:51: 299 AGN have flares in g and r filters
+20250724_23:55:51: 146 AGN have flares in g, r, and i filters
+20250724_23:55:51: 404 / 4454 have no observations in any color in 200 day post GW period
+20250724_23:55:51: 249 / 4454 have no observations in any color before the GW detection
+20250724_23:55:51: saved flare data for S231123cg to ../data/flare_data/flares/S231123cg_tighter_filter.json

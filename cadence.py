@@ -15,11 +15,16 @@ import yaml
 import time
 from astropy.time import Time
 
+# settings for cadence bot
+from utils.parser import followup_parser_args
+
+args = followup_parser_args()
+testing = args.testing
+path_data = args.path_data
+
 
 with open("config/Credentials.yaml", "r") as file:
     credentials = yaml.safe_load(file)
-testing = credentials["testing"]
-path_data = credentials["path_data"]
 kowalskiusername = credentials["kowalski_username"]
 kowalskipassword = credentials["kowalski_password"]
 
