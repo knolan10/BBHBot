@@ -208,3 +208,40 @@
 20250725_21:23:11: Checking 0 photometry requests
 20250725_21:23:11: PART 3: Flare identification
 20250725_21:23:12: No new photometry to check for flares
+20250725_21:33:36: Starting flares.py at at 2025-07-25 21:33:36.367508 with testing = False
+20250725_21:33:36: PART 0: Check status, try to submit queued requests
+20250725_21:33:37: Waiting for photometry: ['S250712cd']
+20250725_21:33:37: Needs photometry request: []
+20250725_21:33:37: No pending jobs
+20250725_21:33:37: PART 1: Photometry Requests
+20250725_21:33:39: 32 significant superevents in O4c
+20250725_21:33:49: 0 new events to process (cut 3 low prob bbh events)
+20250725_21:33:49: found 0 new events
+20250725_21:33:49: 0 errors, 0 correct, 0 inspect
+20250725_21:33:49: No new events to add
+20250725_21:33:51: Crossmatching 0 events: []
+20250725_21:33:51: No catnorth crossmatch
+20250725_21:33:51: 3 O4c events with FAR > 10 and mchirp>22 (mass > 60) and area < 1000 sq deg
+20250725_21:33:51: No changes to commit in the events_summary directory.
+20250725_21:33:51: PART 2: Retrieve Photometry
+20250725_21:33:52: Checking 1 photometry requests
+20250725_21:33:52: Now checking 1 batches new request for event S250712cd on 2025-07-25 20:38:01.148
+20250725_21:33:54: Script executed normally and queried the ZTF Batch Forced Photometry database.
+
+20250725_21:33:57: 61 coords found
+20250725_21:33:57: Returned 1 batches for 1 submitted
+20250725_21:33:59: Script executed normally and queried the ZTF Batch Forced Photometry database.
+
+20250725_21:33:59: Retrieved 61 lightcurves
+20250725_21:34:14: 0 broken urls; 61 lightcurves returned
+20250725_21:34:14: downloaded 61 lightcurves
+20250725_21:34:14: Photometry status updated for S250712cd.
+20250725_21:34:14: PART 3: Flare identification
+20250725_21:34:24: found 1129 AGN
+20250725_21:35:13: in g,r,i we find 7,7,0 candidates
+20250725_21:35:13: 9 unique flares across all colors
+20250725_21:35:13: 5 AGN have flares in g and r filters
+20250725_21:35:13: 0 AGN have flares in g, r, and i filters
+20250725_21:35:13: 1076 / 1129 have no observations in any color in 200 day post GW period
+20250725_21:35:13: 50 / 1129 have no observations in any color before the GW detection
+20250725_21:35:13: saved flare data for S250712cd to data/flare_data/flares/S250712cd.json
