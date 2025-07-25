@@ -25,7 +25,12 @@ from ligo.gracedb.rest import GraceDb
 from penquins import Kowalski
 from matplotlib import rcParams
 
-from trigger_utils.trigger_utils import query_mchirp_gracedb, SkymapCoverage
+from trigger_utils.trigger_utils import (
+    query_mchirp_gracedb,
+    m_total_mlp,
+    get_a,
+    SkymapCoverage,
+)
 from utils.log import Logger
 
 # set up logger (this one wont send to slack)
@@ -46,12 +51,10 @@ class GetSuperevents:
         path_data,
         event_source,
         observing_run,
-        mlp_modelpath="utils/mlp_model.sav",
         kafka_response=None,
         retrieve_all=False,
     ):
         self.path_data = path_data
-        self.mlp_modelpath = mlp_modelpath
         self.event_source = event_source
         self.observing_run = observing_run
         self.kafka_response = kafka_response
@@ -59,7 +62,7 @@ class GetSuperevents:
 
     # TODO : add a date to the gracedb query so we aren't getting all of 04b/O4c etc
     # TODO : add option to update all events, ie to catch updated alert values
-    # TODO : retrun params as dictionary, remove these values: group, significant, prob_bbh, prob_ter, skymap_url, diststd, skymap_str, zmin, zmax, skymap
+    # TODO : return params as dictionary, remove these values: group, significant, prob_bbh, prob_ter, skymap_url, diststd, skymap_str, zmin, zmax, skymap
 
     """
     get new events that haven't been processed yet
@@ -201,16 +204,6 @@ class GetSuperevents:
         skymap_str = base64.b64encode(skymap_bytes).decode("utf-8")
         return skymap, skymap_str
 
-    def get_a(self, skymap, probarea):
-        skymap.sort("PROBDENSITY", reverse=True)
-        level, ipix = ah.uniq_to_level_ipix(skymap["UNIQ"])
-        pixel_area = ah.nside_to_pixel_area(ah.level_to_nside(level))
-        prob = pixel_area * skymap["PROBDENSITY"]
-        cumprob = np.cumsum(prob)
-        i = cumprob.searchsorted(probarea)
-        area = (pixel_area[:i].sum()).to_value(u.deg**2)
-        return area
-
     def extract_skymap_params(self, skymap_url):
         skymap, skymap_str = self.proc_skymap(skymap_url)
         try:
@@ -220,8 +213,8 @@ class GetSuperevents:
             dateobs = Time(t0, precision=0)
             dateobs = Time(dateobs.iso).datetime
             dateobs_str = dateobs.strftime("%Y-%m-%dT%H:%M:%S")
-            a90 = self.get_a(skymap, 0.9)
-            a50 = self.get_a(skymap, 0.5)
+            a90 = get_a(skymap, 0.9)
+            a50 = get_a(skymap, 0.5)
             if distmean - 3 * diststd > 0:
                 zmin = cos.z_at_value(
                     cosmo.luminosity_distance,
@@ -250,13 +243,6 @@ class GetSuperevents:
             logmessage = f"error loading skymap {skymap_url}: {e}"
             logger.log(logmessage, slack=False)
             return "None"
-
-    def m_total_mlp(self, MLP_model, dl_bbh, far, dl_bns=168.0):
-        z = cos.z_at_value(cosmo.luminosity_distance, dl_bbh * u.Mpc, method="bounded")
-        X = np.array([np.log10(dl_bbh / dl_bns), np.log10(1 + z), np.log10(far)])
-        X = X.reshape(1, -1)
-        mass = MLP_model.predict(X)[0]
-        return 10.0**mass
 
     def get_new_events(self):
         if self.event_source == "gracedb":
@@ -294,8 +280,9 @@ class GetSuperevents:
         # mass
         dist = [x[0] for x in skymap_data]
         far = [x[9] for x in params]
-        MLP = pickle.load(open(self.mlp_modelpath, "rb"))
-        mass = [self.m_total_mlp(MLP, d, f, dl_bns=168.0) for d, f in zip(dist, far)]
+        mass = [
+            m_total_mlp(self.path_data, d, f, dl_bns=168.0) for d, f in zip(dist, far)
+        ]
         chirpmass = [query_mchirp_gracedb(str(x[0]), self.path_data) for x in params]
         return [
             list(i) + list(j) + [k] + [chirp]

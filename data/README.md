@@ -54,5 +54,16 @@ Keep track of all forced photometry requests made.
 
 Printouts automatically saved by logger to files here.
 
+## mchirp
 
+Save chirp mass files retrieved from Gracedb
 
+## trigger_data
+
+Tracks all triggered events, and is used to record whether observations were successful and schedule the follow-up cadence of triggers.
+
+- triggered_events.csv
+
+## mlp_modle.sav
+
+Outdated mass estimator, but still will be used to predict mass if chirp mass cannot be retrieved.

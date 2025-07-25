@@ -13,6 +13,7 @@ from datetime import timedelta
 import requests
 from io import BytesIO
 import json
+import pickle
 import xmltodict
 import smtplib
 from penquins import Kowalski
@@ -163,11 +164,13 @@ def get_params(dict):
         raise MyException(f"error getting params for {event_id}: error: {e}") from e
 
 
-def m_total_mlp(MLP_model, dl_bbh, far, dl_bns=168.0):
+def m_total_mlp(path_data, dl_bbh, far, dl_bns=168.0):
+    path_mlp = f"{path_data}/mlp_model.sav"
+    MLP = pickle.load(open(path_mlp, "rb"))
     z = cos.z_at_value(cosmo.luminosity_distance, dl_bbh * u.Mpc, method="bounded")
     X = np.array([np.log10(dl_bbh / dl_bns), np.log10(1 + z), np.log10(far)])
     X = X.reshape(1, -1)
-    mass = MLP_model.predict(X)[0]
+    mass = MLP.predict(X)[0]
     return 10.0**mass
 
 

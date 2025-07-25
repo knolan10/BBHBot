@@ -1,7 +1,6 @@
 from gcn_kafka import Consumer
 import yaml
 import time
-import pickle
 import random
 import threading
 from astropy.time import Time, TimeDelta
@@ -182,8 +181,7 @@ while True:
                     # revert to the mass prediction
                     logmessage = f"Could not find a chirp mass file on GraceDB for {superevent_id}"
                     logger.log(logmessage)
-                    MLP = pickle.load(open("utils/mlp_model.sav", "rb"))
-                    mass = m_total_mlp(MLP, distmean, far, dl_bns=168.0)
+                    mass = m_total_mlp(path_data, distmean, far, dl_bns=168.0)
                     if mass < 60:
                         if triggered:
                             update_trigger_log(
