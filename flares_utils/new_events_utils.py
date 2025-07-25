@@ -727,20 +727,25 @@ class KowalskiCrossmatch:
         kowalski = Kowalski(instances=instances)
         return kowalski
 
-    def check_events_to_crossmatch(self):
+    def check_events_crossmatch(self):
+        # events with crossmatch
+        crossmatch_path = (
+            f"{self.path_data}/flare_data/dicts/crossmatch_dict_{self.observing_run}.gz"
+        )
+        if os.path.exists(crossmatch_path):
+            with gzip.open(crossmatch_path, "rb") as f:
+                crossmatch_dict = pickle.load(f)
+        ids_with_crossmatch = set(crossmatch_dict.keys())
+        # events missing crossmatch
         with open(
             f"{self.path_data}/flare_data/dicts/events_dict_{self.observing_run}.json",
             "r",
         ) as file:
             events_dict_add = json.load(file)
-        do_crossmatch = [
+        ids_missing_crossmatch = [
             key for key, value in events_dict_add.items() if not value["crossmatch"]
         ]
-        logmessage = (
-            f"{len(do_crossmatch)} events are missing crossmatch: {do_crossmatch}"
-        )
-        logger.log(logmessage, slack=False)
-        return do_crossmatch
+        return ids_with_crossmatch, ids_missing_crossmatch
 
     def load_skymap_to_kowalski(
         self, kowalski, localization_name, skymapstring, date, contour, machine
@@ -862,7 +867,6 @@ class KowalskiCrossmatch:
         """
         get catnorth and quaia crossmatches
         """
-        # TODO: fix if crossmatch_new logic
         kowalski = self.kowalski
         localization_name = self.localization_name
         skymap_str = self.skymap_str
@@ -873,26 +877,23 @@ class KowalskiCrossmatch:
         mindec = self.mindec
 
         # sort which events to crossmatch
-        ids_missing_crossmatch = self.check_events_to_crossmatch()
-        ids_to_crossmatch = localization_name
-        ids_missing_crossmatch_not_provided = set(ids_missing_crossmatch) - set(
-            ids_to_crossmatch
-        )
-        ids_provided_already_crossmatched = set(ids_to_crossmatch) - set(
-            ids_missing_crossmatch
-        )
-        if crossmatch_new_only:
-            ids_to_crossmatch = [
-                id
-                for id in ids_to_crossmatch
-                if id not in ids_provided_already_crossmatched
-            ]
-            if ids_provided_already_crossmatched:
-                logmessage = f"Data provided for these events, but skipped bc already have crossmatches: {ids_provided_already_crossmatched}"
+        ids_with_crossmatch, ids_missing_crossmatch = self.check_events_crossmatch()
+
+        for id in ids_missing_crossmatch:
+            if id not in localization_name:
+                logmessage = f"Warning: {id} is missing crossmatch data but not provided in input list"
                 logger.log(logmessage, slack=False)
-        if ids_missing_crossmatch_not_provided:
-            logmessage = f"Warning: the following events are missing crossmatch data: {ids_missing_crossmatch_not_provided}"
-            logger.log(logmessage, slack=False)
+
+        if crossmatch_new_only:
+            ids_to_crossmatch = []
+            for id in localization_name:
+                if id not in ids_with_crossmatch:
+                    ids_to_crossmatch.append(id)
+                else:
+                    logmessage = f"Skipping {id} bc already crossmatched"
+                    logger.log(logmessage, slack=False)
+        else:
+            ids_to_crossmatch = localization_name
 
         logmessage = (
             f"Crossmatching {len(ids_to_crossmatch)} events: {ids_to_crossmatch}"
@@ -965,13 +966,13 @@ class KowalskiCrossmatch:
                 for name, coords in zip(ids_to_crossmatch, catnorth)
             }
             for key, value in crossmatch_dict.items():
-                crossmatch_dict_add[key] = value
                 if key not in crossmatch_dict_add:
-                    logmessage = f"{key} added"
+                    logmessage = f"{key} added to crossmatch dict"
                     logger.log(logmessage, slack=False)
                 else:
                     logmessage = f"{key} replaced previously saved crossmatch"
                     logger.log(logmessage, slack=False)
+                crossmatch_dict_add[key] = value
             if not self.testing:
                 with gzip.open(crossmatch_path, "wb") as f:
                     f.write(pickle.dumps(crossmatch_dict_add))

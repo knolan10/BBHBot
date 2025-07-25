@@ -62,6 +62,7 @@ logger.log("PART 0: Check status, try to submit queued requests")
 do_photometry = (
     True  # this flag will be changed to false if we hit the 15000 request limit
 )
+
 followup = PhotometryLog(
     path_data,
     email=zfps_email,
@@ -202,7 +203,7 @@ for id, date, trigger in zip(eventid, dateobs, trigger_status):
         zfps = "did not make new request"
     time_since_event = Time.now().jd - Time(date).jd
     if (
-        time_since_event > 7
+        time_since_event > 30
     ):  # safeguard: don't automatically request if more than a week has passed
         logger.log(
             f"Not automatically requesting photometry for event {id} because it has been more than 7 days"

@@ -2,7 +2,7 @@
     "summary_stats": {
         "total_requests": 143641,
         "total_currently_pending": 0,
-        "total_saved": 103607
+        "total_saved": 103668
     },
     "events": {
         "S250319bu": {
@@ -134,6 +134,28 @@
                     "complete": true,
                     "from_queue": true,
                     "note": "unsuccessful update, no batches returned"
+                }
+            ]
+        },
+        "S250712cd": {
+            "dateobs": "2025-07-12T14:25:32",
+            "over_200_days": false,
+            "zfps": [
+                {
+                    "catalog": "catnorth",
+                    "submission_date": "2025-07-25 20:38:01.148",
+                    "action": "new",
+                    "num_agn_submitted": 61,
+                    "num_batches_submitted": 1,
+                    "batch_ids": "['12585']",
+                    "number_returned": 61,
+                    "number_broken_urls": 0,
+                    "complete": true
+                },
+                {
+                    "submission_date": "2025-07-21 00:00:00.000",
+                    "action": "missed update",
+                    "complete": true
                 }
             ]
         }

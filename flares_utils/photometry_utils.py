@@ -1033,13 +1033,11 @@ class PhotometryLog:
         """
         if event_id not in self.photometry_pipeline["events"]:
             self.photometry_pipeline["events"][event_id] = event_data
-            try:
-                if isinstance(event_data["zfps"][0], str):
-                    num_agn = 0
-                else:
-                    num_agn = event_data["zfps"]["num_agn_submitted"]
-            except KeyError:
-                num_agn = 0
+            num_agn = (
+                event_data.get("zfps", {}).get("num_agn_submitted", 0)
+                if isinstance(event_data.get("zfps"), dict)
+                else 0
+            )
             self.update_summary_stats(
                 number_requested=num_agn, number_saved=0, keyword="new_request"
             )
@@ -1108,7 +1106,7 @@ class PhotometryLog:
                 [
                     x
                     for x in self.photometry_pipeline["events"][id]["zfps"]
-                    if "from_queue" not in x
+                    if "from_queue" not in x.keys()
                 ]
             )
             time_delta_thresholds = [9, 16, 23, 30, 52, 100]
