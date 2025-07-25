@@ -6,7 +6,7 @@ from flares_utils.new_events_utils import (
     Fritz,
     NewEventsToDict,
     KowalskiCrossmatch,
-    PushEventsPublic,
+    FormatEventsToPublish,
 )
 from flares_utils.photometry_utils import (
     PhotometryLog,
@@ -188,7 +188,7 @@ crossmatch = KowalskiCrossmatch(
 matches = crossmatch.get_crossmatches()
 
 # compile all this info in events_summary directory
-df, priority, trigger_df, error_triggers = PushEventsPublic(
+df, priority, trigger_df, error_triggers = FormatEventsToPublish(
     path_data, github_token, observing_run=observing_run, testing=testing
 ).push_events()
 

@@ -4,7 +4,7 @@ import os
 import requests
 import subprocess
 
-# TODO: add email function here
+# TODO: move email function here
 # TODO: more sophisticated log level: debug, info, warning, error, critical to set once when running codebase
 
 
