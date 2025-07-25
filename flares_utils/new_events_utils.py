@@ -17,7 +17,6 @@ import gzip
 import base64
 import json
 import os
-import subprocess
 from ligo.skymap.io import read_sky_map
 import ligo.skymap.plot
 import ligo.skymap.postprocess
@@ -31,14 +30,12 @@ from trigger_utils.trigger_utils import (
     get_a,
     SkymapCoverage,
 )
-from utils.log import Logger
+from utils.log import Logger, PublishToGithub
 
 # set up logger (this one wont send to slack)
 logger = Logger(filename="cadence_utils")
 
 rcParams["font.family"] = "Liberation Serif"
-
-g = GraceDb()
 
 
 class MyException(Exception):
@@ -59,6 +56,7 @@ class GetSuperevents:
         self.observing_run = observing_run
         self.kafka_response = kafka_response
         self.retrieve_all = retrieve_all
+        self.g = GraceDb()
 
     # TODO : add a date to the gracedb query so we aren't getting all of 04b/O4c etc
     # TODO : add option to update all events, ie to catch updated alert values
@@ -75,7 +73,7 @@ class GetSuperevents:
     def read_from_gracedb(self, ids, files):
         # TODO: assuming there is a better way to select the most recent gcn
         superevent_files = [i["links"]["files"] for i in files]
-        event_files = [g.files(graceid).json() for graceid in ids]
+        event_files = [self.g.files(graceid).json() for graceid in ids]
         file = [
             "none"
             if any("etraction" in s for s in list(files))
@@ -246,13 +244,15 @@ class GetSuperevents:
 
     def get_new_events(self):
         if self.event_source == "gracedb":
-            event_iterator = g.superevents(f"runid: {self.observing_run} SIGNIF_LOCKED")
+            event_iterator = self.g.superevents(
+                f"runid: {self.observing_run} SIGNIF_LOCKED"
+            )
             graceids = [superevent["superevent_id"] for superevent in event_iterator]
             logmessage = (
                 f"{len(graceids)} significant superevents in {self.observing_run}"
             )
             logger.log(logmessage, slack=False)
-            responses = [g.superevent(id) for id in graceids]
+            responses = [self.g.superevent(id) for id in graceids]
             data = [r.json() for r in responses]
             if not self.retrieve_all:
                 with open(
@@ -1005,7 +1005,7 @@ class KowalskiCrossmatch:
             return catnorth, quaia
 
 
-class PushEventsPublic:
+class FormatEventsToPublish:
     def __init__(self, path_data, github_token, observing_run, testing=False):
         self.path_data = path_data
         self.github_token = github_token
@@ -1144,58 +1144,7 @@ class PushEventsPublic:
         plt.tight_layout()
         plt.show()
 
-    def push_changes_to_repo(self):
-        """
-        Push changes in the events_summary directory to the remote GitHub repository.
-        """
-        commit_message = "automated push of new events"
-        try:
-            if not self.github_token:
-                raise ValueError(
-                    "GitHub token is missing. Please provide a valid token."
-                )
-
-            remote_url = f"https://{self.github_token}@github.com/knolan10/BBHBot.git"
-            path_events_summary = f"{self.path_data}/events_summary"
-
-            # Set the remote URL for the repository
-            subprocess.run(
-                ["git", "remote", "set-url", "origin", remote_url], check=True
-            )
-
-            # Stage changes in the events_summary directory
-            subprocess.run(["git", "add", path_events_summary], check=True)
-
-            # Check for changes in the repository
-            result = subprocess.run(
-                ["git", "status", "--porcelain", f"{self.path_data}/events_summary"],
-                capture_output=True,
-                text=True,
-            )
-            if not result.stdout.strip():
-                logmessage = "No changes to commit in the events_summary directory."
-                logger.log(logmessage, slack=False)
-                return
-
-            # Commit changes
-            subprocess.run(["git", "commit", "-m", commit_message], check=True)
-
-            # Push changes to the remote repository
-            subprocess.run(["git", "push", "origin", "main"], check=True)
-            logmessage = "Changes pushed to the repository successfully."
-            logger.log(logmessage, slack=False)
-
-        except subprocess.CalledProcessError as e:
-            logmessage = f"An error occurred while running a git command: {e}"
-            logger.log(logmessage, slack=False)
-        except ValueError as ve:
-            logmessage = f"Error: {ve}"
-            logger.log(logmessage, slack=False)
-        except Exception as ex:
-            logmessage = f"An unexpected error occurred: {ex}"
-            logger.log(logmessage, slack=False)
-
-    def format_and_push(self):
+    def push_events(self):
         # get events from multiple runs (we present a single markdown file for trigger and error trigger)
         events_dict_add = {}
         # TODO: make a "maintenance" doc and note that new runids should be added as they start
@@ -1404,7 +1353,10 @@ class PushEventsPublic:
             for file_path, content in files_to_write.items():
                 with open(file_path, "w") as f:
                     f.write(content)
-            self.push_changes_to_repo()
+            path_events_summary = f"{self.path_data}/events_summary"
+            PublishToGithub(
+                self.github_token, logger, testing=self.testing
+            ).push_changes_to_repo(path_events_summary)
 
         return df, priority, trigger_df, error_triggers
 
@@ -1415,6 +1367,7 @@ class PlotSkymap:
         self.path_data = path_data
         self.observing_run = observing_run
         self.catalog = catalog
+        self.g = GraceDb()
 
     def load_agn_crossmatches(self):
         with gzip.open(
@@ -1428,7 +1381,7 @@ class PlotSkymap:
             return ra, dec
 
     def get_moc(self):
-        event_files = g.files(self.gracedbid).json()
+        event_files = self.g.files(self.gracedbid).json()
         mocs = [k for k in list(event_files) if "multiorder" in k]
         if not mocs:
             url = "none"

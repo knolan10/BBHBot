@@ -11,7 +11,7 @@ from astropy.time import Time
 import glob
 from matplotlib import rcParams
 
-from utils.log import Logger
+from utils.log import Logger, PublishToGithub
 
 # set up logger (this one wont send to slack)
 logger = Logger(filename="cadence_utils")
@@ -347,7 +347,7 @@ class RollingWindowHeuristic:
         logger.log(logmessage, slack=False)
         return number_no_gw_points, number_no_baseline_points
 
-    def get_flares(self, custom_filter_name=None):
+    def get_flares(self, github_token, custom_filter_name=None):
         g, r, i = self.medians_test()
         unique_index = list(set(g + r + i))
         logmessage = f"{len(unique_index)} unique flares across all colors"
@@ -413,6 +413,10 @@ class RollingWindowHeuristic:
                 json.dump(data, json_file)
             logmessage = f"saved flare data for {self.graceid} to {path}"
             logger.log(logmessage, slack=False)
+            # automated push
+            PublishToGithub(
+                github_token, logger, testing=self.testing
+            ).push_changes_to_repo(directory)
 
         return g, r, i, gr, gri
 

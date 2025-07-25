@@ -2,6 +2,7 @@ import datetime
 import time
 import os
 import requests
+import subprocess
 
 # TODO: add email function here
 # TODO: more sophisticated log level: debug, info, warning, error, critical to set once when running codebase
@@ -102,3 +103,60 @@ class Logger:
         while True:
             self.log("heartbeat", slack=False)
             time.sleep(60)
+
+
+class PublishToGithub:
+    def __init__(self, github_token, logger, testing=False):
+        self.github_token = github_token
+        self.logger = logger
+        self.testing = testing
+
+    def push_changes_to_repo(self, path_to_push):
+        """
+        Push changes in a given directory to the remote GitHub repository.
+        """
+        commit_message = "automated push by BBHBot"
+        try:
+            if not self.github_token:
+                raise ValueError(
+                    "GitHub token is missing. Please provide a valid token."
+                )
+
+            remote_url = f"https://{self.github_token}@github.com/knolan10/BBHBot.git"
+
+            # Set the remote URL for the repository
+            subprocess.run(
+                ["git", "remote", "set-url", "origin", remote_url], check=True
+            )
+
+            # Stage changes in the events_summary directory
+            subprocess.run(["git", "add", path_to_push], check=True)
+
+            # Check for changes in the repository
+            result = subprocess.run(
+                ["git", "status", "--porcelain", path_to_push],
+                capture_output=True,
+                text=True,
+            )
+            if not result.stdout.strip():
+                logmessage = f"No changes to commit in the {path_to_push}."
+                self.logger.log(logmessage, slack=False)
+                return
+
+            # Commit changes
+            subprocess.run(["git", "commit", "-m", commit_message], check=True)
+
+            # Push changes to the remote repository
+            subprocess.run(["git", "push", "origin", "main"], check=True)
+            logmessage = "Changes pushed to the repository successfully."
+            self.logger.log(logmessage, slack=False)
+
+        except subprocess.CalledProcessError as e:
+            logmessage = f"An error occurred while running a git command: {e}"
+            self.logger.log(logmessage, slack=False)
+        except ValueError as ve:
+            logmessage = f"Error: {ve}"
+            self.logger.log(logmessage, slack=False)
+        except Exception as ex:
+            logmessage = f"An unexpected error occurred: {ex}"
+            self.logger.log(logmessage, slack=False)

@@ -190,7 +190,7 @@ matches = crossmatch.get_crossmatches()
 # compile all this info in events_summary directory
 df, priority, trigger_df, error_triggers = PushEventsPublic(
     path_data, github_token, observing_run=observing_run, testing=testing
-).format_and_push()
+).push_events()
 
 # get triggered events for automatated photometry request
 for id, date, trigger in zip(eventid, dateobs, trigger_status):
@@ -338,4 +338,4 @@ for id in check_for_flares:
         percent=0.6,
         k_mad=3,
         testing=testing,
-    ).get_flares()
+    ).get_flares(github_token=github_token)
