@@ -1666,7 +1666,7 @@ class VisualizePop:
 
                 plt.xlabel("Chirp Mass", fontsize=14)
                 plt.ylabel("Mass (M$_{\\odot}$)", fontsize=14)
-                plt.title(f"Chirp Mass vs Solar Mass for {run}", fontsize=16)
+                plt.title(f"Mass Prediction vs Chirp Mass for {run}", fontsize=16)
                 plt.show()
 
             except FileNotFoundError:
