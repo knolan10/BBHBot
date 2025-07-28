@@ -33,7 +33,7 @@ from trigger_utils.trigger_utils import (
 from utils.log import Logger, PublishToGithub
 
 # set up logger (this one wont send to slack)
-logger = Logger(filename="cadence_utils")
+logger = Logger(filename="new_events_utils")
 
 rcParams["font.family"] = "Liberation Serif"
 
@@ -523,7 +523,7 @@ class Fritz:
                 900,
                 0.5,
                 "",
-            ],  # the Swift/Bat coincident detection
+            ],  # the Swift/Bat coincident detection manual trigger
             "S241130n": ["correct", "not triggered", 0, 0, ""],  # sun too close ?
             "S250727cl": ["correct", "not triggered", 0, 0, ""],  # sun too close ?
         }
