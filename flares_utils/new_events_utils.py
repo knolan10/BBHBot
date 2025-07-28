@@ -1467,16 +1467,42 @@ class VisualizePop:
     def __init__(self, path_data, observing_run):
         self.path_data = path_data
         self.observing_run = observing_run
+        self.bin_edges = [
+            0.1,
+            0.87,
+            1.0,
+            1.1,
+            1.2,
+            1.3,
+            1.4,
+            1.5,
+            1.7,
+            1.9,
+            2.1,
+            2.3,
+            3.0,
+            5.5,
+            11.0,
+            22.0,
+            44.0,
+            88.0,
+            1000.0,
+        ]
 
-    def plot_masses(self):
+    def histogram_masses(self):
         # Ensure runid is a list for consistent processing
         if not isinstance(self.observing_run, list):
             self.observing_run = [self.observing_run]
         colors = ["#040348", "#FF5733", "#33FF57"]
         color_cycle = iter(colors)
-        plt.figure(figsize=(10, 6))
-        bin_edges = None
-        stacked_heights = None
+
+        # Create subplots
+        fig, axes = plt.subplots(1, 2, figsize=(14, 6))
+        bin_edges_masses = None
+        stacked_heights_masses = None
+        bin_edges_chirp = None
+        stacked_heights_chirp = None
+
         for run in self.observing_run:
             try:
                 # Load the events dictionary for the current runid
@@ -1484,46 +1510,165 @@ class VisualizePop:
                     f"{self.path_data}/flare_data/dicts/events_dict_{run}.json", "r"
                 ) as file:
                     events_dict_add = json.load(file)
-                # Extract masses
+
+                # Extract masses and chirp masses
+                chirp_masses = [
+                    event["gw"]["Chirp Mass (left edge)"]
+                    for event in events_dict_add.values()
+                    if "gw" in event and "Chirp Mass (left edge)" in event["gw"]
+                ]
                 masses = [
                     event["gw"]["Mass (M_sol)"]
                     for event in events_dict_add.values()
-                    if "gw" in event and "Mass (M_sol)" in event["gw"]
+                    if "gw" in event
+                    and "Mass (M_sol)" in event["gw"]
+                    and "Chirp Mass (left edge)" not in event["gw"]
                 ]
-                # Compute histogram data
-                counts, bins = np.histogram(
-                    masses, bins=30, range=(min(masses), max(masses))
-                )
-                # Initialize bin_edges and stacked_heights on the first iteration
-                if bin_edges is None:
-                    bin_edges = bins
-                    stacked_heights = np.zeros_like(counts)
+
                 color = next(
                     color_cycle,
                     np.random.rand(
                         3,
                     ),
-                )  # Use predefined color or random if exhausted
-                plt.bar(
-                    bin_edges[:-1],
-                    counts,
-                    width=np.diff(bin_edges),
-                    bottom=stacked_heights,
-                    color=color,
-                    edgecolor="black",
-                    label=f"{run}",
-                    align="edge",
                 )
-                stacked_heights += counts
+
+                # Plot masses histogram
+                if masses:
+                    counts_masses, bins_masses = np.histogram(
+                        masses, bins=30, range=(min(masses), max(masses))
+                    )
+                    if bin_edges_masses is None:
+                        bin_edges_masses = bins_masses
+                        stacked_heights_masses = np.zeros_like(counts_masses)
+                    axes[0].bar(
+                        bin_edges_masses[:-1],
+                        counts_masses,
+                        width=np.diff(bin_edges_masses),
+                        bottom=stacked_heights_masses,
+                        color=color,
+                        edgecolor="black",
+                        label=f"{run}",
+                        align="edge",
+                    )
+                    stacked_heights_masses += counts_masses
+
+                # Plot chirp masses histogram
+                if chirp_masses:
+                    # Use the same bin edges for all histograms
+                    if bin_edges_chirp is None:
+                        # Ensure self.bin_edges is a NumPy array
+                        bin_edges_chirp = np.array(
+                            self.bin_edges
+                        )  # Use predefined bin edges
+                        stacked_heights_chirp = np.zeros(len(bin_edges_chirp) - 1)
+
+                    # Calculate histogram counts using the predefined bin edges
+                    counts_chirp, _ = np.histogram(chirp_masses, bins=bin_edges_chirp)
+
+                    # Calculate bin centers for centering the bars
+                    bin_centers_chirp = (bin_edges_chirp[:-1] + bin_edges_chirp[1:]) / 2
+
+                    # Plot the histogram bars centered on the bin centers
+                    axes[1].bar(
+                        bin_centers_chirp,  # Center the bars
+                        counts_chirp,
+                        width=np.diff(bin_edges_chirp),  # Span the width of the bin
+                        bottom=stacked_heights_chirp,
+                        color=color,
+                        edgecolor="black",
+                        label=f"{run}",
+                        align="center",  # Center the bars
+                    )
+
+                    # Update the stacked heights
+                    stacked_heights_chirp += counts_chirp
+
+                    # fix x axis scale
+                    max_chirp_mass = max(chirp_masses)
+                    right_edge = bin_edges_chirp[
+                        np.searchsorted(bin_edges_chirp, max_chirp_mass, side="right")
+                    ]
+                    axes[1].set_xlim(0, right_edge * 1.1)
+
             except FileNotFoundError:
                 logmessage = f"File for runid {run} not found. Skipping."
                 logger.log(logmessage, slack=False)
-            except Exception as e:
-                logmessage = f"Error processing runid {run}: {e}. Skipping."
-                logger.log(logmessage, slack=False)
-        plt.title("Significant BBH Mass Distribution", fontsize=20)
-        plt.xlabel("Mass (M$_{\\odot}$)", fontsize=18)
-        plt.ylabel("Count", fontsize=18)
-        plt.tick_params(axis="both", which="major", labelsize=16)
-        plt.legend(fontsize=14)
+
+        # Configure subplot for masses
+        axes[0].set_title("Significant BBH Mass Distribution", fontsize=16)
+        axes[0].set_xlabel("Mass (M$_{\\odot}$)", fontsize=14)
+        axes[0].set_ylabel("Count", fontsize=14)
+        axes[0].tick_params(axis="both", which="major", labelsize=12)
+        axes[0].legend(fontsize=12)
+
+        # Configure subplot for chirp masses
+        axes[1].set_title("Significant BBH Chirp Mass Distribution", fontsize=16)
+        axes[1].set_xlabel("Chirp Mass", fontsize=14)
+        axes[1].set_ylabel("Count", fontsize=14)
+        axes[1].tick_params(axis="both", which="major", labelsize=12)
+        axes[1].legend(fontsize=12)
+
+        # Adjust layout and show the plot
+        plt.tight_layout()
         plt.show()
+
+    def compare_mass_estimate(self):
+        for run in self.observing_run:
+            try:
+                # Load the events dictionary for the current runid
+                with open(
+                    f"{self.path_data}/flare_data/dicts/events_dict_{run}.json", "r"
+                ) as file:
+                    events_dict_add = json.load(file)
+
+                events_with_both_masses = [
+                    event
+                    for event in events_dict_add.values()
+                    if "gw" in event
+                    and "Chirp Mass (left edge)" in event["gw"]
+                    and "Mass (M_sol)" in event["gw"]
+                ]
+                if not events_with_both_masses:
+                    continue
+
+                # Extract masses and chirp masses
+                chirp_masses = [
+                    event["gw"]["Chirp Mass (left edge)"]
+                    for event in events_with_both_masses
+                ]
+                solar_masses = [
+                    event["gw"]["Mass (M_sol)"] for event in events_with_both_masses
+                ]
+
+                # Calculate bin widths for each chirp mass
+                bin_widths = []
+                for chirp_mass in chirp_masses:
+                    for i in range(len(self.bin_edges) - 1):
+                        if self.bin_edges[i] <= chirp_mass < self.bin_edges[i + 1]:
+                            bin_widths.append(
+                                (self.bin_edges[i], self.bin_edges[i + 1])
+                            )
+                            break
+
+                # Make a scatterplot with bars
+                plt.figure(figsize=(8, 6))
+                for chirp_mass, solar_mass, (left_edge, right_edge) in zip(
+                    chirp_masses, solar_masses, bin_widths
+                ):
+                    plt.hlines(
+                        y=solar_mass,
+                        xmin=left_edge,
+                        xmax=right_edge,
+                        color="blue",
+                        alpha=0.5,
+                        linewidth=2,
+                    )
+
+                plt.xlabel("Chirp Mass", fontsize=14)
+                plt.ylabel("Mass (M$_{\\odot}$)", fontsize=14)
+                plt.title(f"Chirp Mass vs Solar Mass for {run}", fontsize=16)
+                plt.show()
+
+            except FileNotFoundError:
+                logmessage = f"File for runid {run} not found. Skipping."
+                logger.log(logmessage, slack=False)
