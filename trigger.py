@@ -2,7 +2,6 @@ from gcn_kafka import Consumer
 import yaml
 import time
 import random
-import threading
 from astropy.time import Time, TimeDelta
 from ligo.gracedb.exceptions import HTTPError
 
@@ -91,10 +90,11 @@ consumer = Consumer(
 consumer.subscribe(topics)
 logger.log(f"subscribed to Kafka consumer with groupid {configid} and topics {topics}")
 
+# TODO: fix heartbeat - this works but prevents kafka cons
 # heartbeat will print a message every minute
-heartbeat_thread = threading.Thread(target=logger.heartbeat())
-heartbeat_thread.daemon = True
-heartbeat_thread.start()
+# heartbeat_thread = threading.Thread(target=logger.heartbeat())
+# heartbeat_thread.daemon = True
+# heartbeat_thread.start()
 
 while True:
     try:
@@ -191,17 +191,13 @@ while True:
                             logger.log(
                                 f"attempting to remove trigger for {superevent_id}"
                             )
-                        logmessage = f"{superevent_id} did not pass mass criteria"
-                        logger.log(logmessage)
-                        raise MyException(logmessage)
-                        delete_trigger_ztf(trigger_plan_id, fritz_token, mode)
-                        logger.log(f"attempting to remove trigger for {superevent_id}")
-                    logmessage = f"{superevent_id} did not pass mass criteria"
+                    logmessage = (
+                        f"{superevent_id} with mass={mass} did not pass mass criteria"
+                    )
                     logger.log(logmessage)
                     raise MyException(logmessage)
 
                 logger.log(f"{superevent_id} passed mass criteria")
-
                 # find gcn event on fritz
                 if not testing:
                     time.sleep(30)
@@ -367,12 +363,12 @@ while True:
                 )  # after triggering pause to avoid double triggers on quickly updated gcn
 
             except MyException as e:
-                logger.log(e)
+                logger.log(e, slack=False)
                 continue
 
             finally:
                 consumer.commit(message)
 
     except Exception as e:
-        logger.log(e)
+        logger.log(e, slack=False)
         continue

@@ -395,10 +395,6 @@ class Fritz:
                         x
                         for x in matching_requests
                         if x["observation_plans"][0]["statistics"]
-                        and x["observation_plans"][0]["statistics"][0]["statistics"][
-                            "num_observations"
-                        ]
-                        != 0
                     ]
                     if not plans:
                         if far < 10 or a90 > 1000 or mass < 60:
@@ -409,8 +405,22 @@ class Fritz:
                             logmessage = f"No valid plans found for {eventid}"
                             logger.log(logmessage, slack=False)
                             return ["error", "no valid plan"]
+                    plans_with_observations = [
+                        x
+                        for x in plans
+                        if x["observation_plans"][0]["statistics"][0]["statistics"][
+                            "num_observations"
+                        ]
+                        != 0
+                    ]
+                    if not plans_with_observations:
+                        logmessage = f"generated observation plan returned zero coverage of {eventid}"
+                        logger.log(logmessage, slack=False)
+                        return ["correct", "not triggered"]
                 # for non triggered events take the most recent plan as truth, ie if earlier plan passes criteria but later one doesn't go by the later one
-                most_recent_plan = max(plans, key=lambda x: x["modified"])
+                most_recent_plan = max(
+                    plans_with_observations, key=lambda x: x["modified"]
+                )
                 observation_plan = most_recent_plan["observation_plans"]
                 stats = observation_plan[0]["statistics"]
                 total_time = stats[0]["statistics"]["total_time"]
@@ -515,6 +525,7 @@ class Fritz:
                 "",
             ],  # the Swift/Bat coincident detection
             "S241130n": ["correct", "not triggered", 0, 0, ""],  # sun too close ?
+            "S250727cl": ["correct", "not triggered", 0, 0, ""],  # sun too close ?
         }
         for key, value in maunual_edits.items():
             if key in self.eventid:
@@ -1216,12 +1227,15 @@ class FormatEventsToPublish:
         df.loc[df["graceids"].str.contains("S241125n"), "comments"] = (
             "Swift/Bat coincident detection"
         )
-        df.loc[df["graceids"].str.contains("S241130n"), "comments"] = "sun too close"
+        df.loc[
+            df["graceids"].str.contains("S241130n|S250727cl", regex=True), "comments"
+        ] = "sun too close"
         df.loc[df["graceids"].str.contains("S250712cd"), "comments"] = (
             "serendipitous coverage"
         )
 
         # priority df
+        # filter for events in current observing run
         df_priority = df[
             df["graceids"].str.contains("|".join(current_run_ids), na=False)
         ]
@@ -1257,18 +1271,15 @@ class FormatEventsToPublish:
         # #add comments
         # TODO: add to maintenance doc
         priority["comments"] = ""
-        priority.loc[priority["graceids"].str.contains("S241210cw"), "comments"] = (
-            "Sun too close"
-        )
-        priority.loc[priority["graceids"].str.contains("S241130n"), "comments"] = (
-            "Sun too close"
-        )
-        priority.loc[priority["graceids"].str.contains("S241129aa"), "comments"] = (
-            "Southern target"
-        )
-        priority.loc[priority["graceids"].str.contains("S240924a"), "comments"] = (
-            "Southern target"
-        )
+        priority.loc[
+            df["graceids"].str.contains("S241130n|S241210cw|S250727cl", regex=True),
+            "comments",
+        ] = "sun too close"
+        priority.loc[
+            df["graceids"].str.contains("S241129aa|S240924a|S250727dc", regex=True),
+            "comments",
+        ] = "Southern target"
+
         # remove nan gcnids
         priority["gcnids"] = priority["gcnids"].apply(
             lambda x: "" if isinstance(x, str) and "nan" in x else x
@@ -1300,7 +1311,6 @@ class FormatEventsToPublish:
             | (df_full["trigger"] == "missed trigger")
             | (df_full["trigger"] == "nan")
             | (df_full["trigger"] == "no plan")
-            | (df_full["trigger"] == "no valid plan")
         ]
         error_triggers = error_triggers.drop(
             columns=[
@@ -1318,8 +1328,7 @@ class FormatEventsToPublish:
             "[2024-09-15T10:51:51](https://fritz.science/gcn_events/2024-09-15T10:51:51)"
         )
         # add comments
-        error_triggers["comments"] = "fails mass criteria"
-        error_triggers["comments"] = "fails mass criteria"
+        error_triggers["comments"] = ""
         error_triggers.loc[error_triggers["GW MJD"] == 60694, "comments"] = (
             "plan has zero observations"
         )
