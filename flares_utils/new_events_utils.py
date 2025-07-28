@@ -1417,7 +1417,9 @@ class PlotSkymap:
             skymap = read_sky_map(url)[0]
             return skymap
 
-    def plot(self, RA_unit="hours", show_contour=False, show_agn=True):
+    def plot(
+        self, RA_unit="hours", show_contour=False, show_agn=True, agn_markersize=0.02
+    ):
         """
         Plot skymaps
 
@@ -1454,7 +1456,7 @@ class PlotSkymap:
                 dec,
                 "o",
                 color="orange",
-                markersize=0.02,
+                markersize=agn_markersize,
                 transform=ax.get_transform("world"),
             )
         plt.title(self.gracedbid)
