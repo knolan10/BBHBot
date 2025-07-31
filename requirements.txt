@@ -13,5 +13,5 @@ requests
 seaborn
 scikit-learn
 scipy
-smtplib
+secure-smtplib
 xmltodict
