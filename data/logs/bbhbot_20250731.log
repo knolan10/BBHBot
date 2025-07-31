@@ -1,0 +1,280 @@
+20250731_21:05:54: Starting TriggerBot with testing = False
+20250731_21:05:54: subscribed to Kafka consumer with groupid ztfmasstrigger and topics ['gcn.classic.voevent.LVC_PRELIMINARY', 'gcn.classic.voevent.LVC_INITIAL', 'gcn.classic.voevent.LVC_UPDATE']
+20250731_21:05:56: Error getting params: could not parse GraceID: Not a superevent: MS250728v.
+20250731_21:05:56: Error getting params: could not parse GraceID: Not a superevent: MS250728w.
+20250731_21:05:56: Error getting params: could not parse GraceID: Not a superevent: MS250728x.
+20250731_21:05:56: Error getting params: could not parse GraceID: Not a superevent: MS250729a.
+20250731_21:05:56: Error getting params: could not parse GraceID: Not a superevent: MS250729e.
+20250731_21:05:56: Error getting params: could not parse GraceID: Not a superevent: MS250729g.
+20250731_21:05:56: Error getting params: could not parse GraceID: Not a superevent: MS250729h.
+20250731_21:05:56: Error getting params: could not parse GraceID: Not a superevent: MS250729i.
+20250731_21:05:56: Error getting params: could not parse GraceID: Not a superevent: MS250729k.
+20250731_21:05:56: Error getting params: could not parse GraceID: Not a superevent: MS250729m.
+20250731_21:05:56: Error getting params: could not parse GraceID: Not a superevent: MS250729n.
+20250731_21:05:56: Error getting params: could not parse GraceID: Not a superevent: MS250729o.
+20250731_21:05:56: Error getting params: could not parse GraceID: Not a superevent: MS250729q.
+20250731_21:05:56: Error getting params: could not parse GraceID: Not a superevent: MS250729r.
+20250731_21:05:56: Error getting params: could not parse GraceID: Not a superevent: MS250729s.
+20250731_21:05:56: Error getting params: could not parse GraceID: Not a superevent: MS250729u.
+20250731_21:05:56: Error getting params: could not parse GraceID: Not a superevent: MS250729v.
+20250731_21:05:56: Error getting params: could not parse GraceID: Not a superevent: MS250729w.
+20250731_21:05:56: Error getting params: could not parse GraceID: Not a superevent: MS250729x.
+20250731_21:05:56: Error getting params: could not parse GraceID: Not a superevent: MS250730b.
+20250731_21:05:56: Error getting params: could not parse GraceID: Not a superevent: MS250730c.
+20250731_21:05:56: Error getting params: could not parse GraceID: Not a superevent: MS250730g.
+20250731_21:05:56: Error getting params: could not parse GraceID: Not a superevent: MS250728r.
+20250731_21:05:56: Error getting params: could not parse GraceID: Not a superevent: MS250728r.
+20250731_21:05:56: Error getting params: could not parse GraceID: Not a superevent: MS250728s.
+20250731_21:05:56: Error getting params: could not parse GraceID: Not a superevent: MS250728s.
+20250731_21:05:56: Error getting params: could not parse GraceID: Not a superevent: MS250728t.
+20250731_21:05:56: Error getting params: could not parse GraceID: Not a superevent: MS250728t.
+20250731_21:05:56: Error getting params: could not parse GraceID: Not a superevent: MS250728u.
+20250731_21:05:56: Error getting params: could not parse GraceID: Not a superevent: MS250728u.
+20250731_21:05:56: Error getting params: could not parse GraceID: Not a superevent: MS250728v.
+20250731_21:05:56: Error getting params: could not parse GraceID: Not a superevent: MS250728v.
+20250731_21:05:56: Error getting params: could not parse GraceID: Not a superevent: MS250728w.
+20250731_21:05:56: Error getting params: could not parse GraceID: Not a superevent: MS250728w.
+20250731_21:05:56: Error getting params: could not parse GraceID: Not a superevent: MS250728x.
+20250731_21:05:56: Error getting params: could not parse GraceID: Not a superevent: MS250728x.
+20250731_21:05:56: Error getting params: could not parse GraceID: Not a superevent: MS250729a.
+20250731_21:05:56: Error getting params: could not parse GraceID: Not a superevent: MS250729a.
+20250731_21:05:56: Error getting params: could not parse GraceID: Not a superevent: MS250729b.
+20250731_21:05:56: Error getting params: could not parse GraceID: Not a superevent: MS250729b.
+20250731_21:05:56: Error getting params: could not parse GraceID: Not a superevent: MS250729c.
+20250731_21:05:56: Error getting params: could not parse GraceID: Not a superevent: MS250729c.
+20250731_21:05:56: Error getting params: could not parse GraceID: Not a superevent: MS250729d.
+20250731_21:05:56: Error getting params: could not parse GraceID: Not a superevent: MS250729d.
+20250731_21:05:56: Error getting params: could not parse GraceID: Not a superevent: MS250729e.
+20250731_21:05:56: Error getting params: could not parse GraceID: Not a superevent: MS250729e.
+20250731_21:05:56: Error getting params: could not parse GraceID: Not a superevent: MS250729f.
+20250731_21:05:56: Error getting params: could not parse GraceID: Not a superevent: MS250729f.
+20250731_21:05:57: S250729n did not pass initial criteria
+20250731_21:05:57: S250729n did not pass initial criteria
+20250731_21:05:58: S250729n did not pass initial criteria
+20250731_21:05:58: S250729n did not pass initial criteria
+20250731_21:05:58: Error getting params: could not parse GraceID: Not a superevent: MS250729g.
+20250731_21:05:58: Error getting params: could not parse GraceID: Not a superevent: MS250729g.
+20250731_21:05:58: Error getting params: could not parse GraceID: Not a superevent: MS250729h.
+20250731_21:05:58: Error getting params: could not parse GraceID: Not a superevent: MS250729h.
+20250731_21:05:59: S250729ak did not pass initial criteria
+20250731_21:05:59: S250729ak did not pass initial criteria
+20250731_21:06:00: S250729ak did not pass initial criteria
+20250731_21:06:00: S250729ak did not pass initial criteria
+20250731_21:06:00: Error getting params: could not parse GraceID: Not a superevent: MS250729i.
+20250731_21:06:00: Error getting params: could not parse GraceID: Not a superevent: MS250729i.
+20250731_21:06:00: S250729au did not pass initial criteria
+20250731_21:06:00: S250729au did not pass initial criteria
+20250731_21:06:01: S250729au did not pass initial criteria
+20250731_21:06:01: S250729au did not pass initial criteria
+20250731_21:06:01: Error getting params: could not parse GraceID: Not a superevent: MS250729j.
+20250731_21:06:01: Error getting params: could not parse GraceID: Not a superevent: MS250729j.
+20250731_21:06:01: Error getting params: could not parse GraceID: Not a superevent: MS250729k.
+20250731_21:06:01: Error getting params: could not parse GraceID: Not a superevent: MS250729k.
+20250731_21:06:01: S250729bg did not pass initial criteria
+20250731_21:06:02: S250729bg did not pass initial criteria
+20250731_21:06:02: S250729bg did not pass initial criteria
+20250731_21:06:02: S250729bg did not pass initial criteria
+20250731_21:06:03: S250729bi did not pass initial criteria
+20250731_21:06:03: S250729bi did not pass initial criteria
+20250731_21:06:04: S250729bi did not pass initial criteria
+20250731_21:06:04: S250729bi did not pass initial criteria
+20250731_21:06:04: S250729bm did not pass initial criteria
+20250731_21:06:04: S250729bm did not pass initial criteria
+20250731_21:06:05: S250729bm did not pass initial criteria
+20250731_21:06:05: S250729bm did not pass initial criteria
+20250731_21:06:05: Error getting params: could not parse GraceID: Not a superevent: MS250729l.
+20250731_21:06:05: Error getting params: could not parse GraceID: Not a superevent: MS250729l.
+20250731_21:06:05: S250729bt did not pass initial criteria
+20250731_21:06:06: S250729bt did not pass initial criteria
+20250731_21:06:06: S250729bt did not pass initial criteria
+20250731_21:06:07: S250729bt did not pass initial criteria
+20250731_21:06:07: S250729bz did not pass initial criteria
+20250731_21:06:08: S250729bz did not pass initial criteria
+20250731_21:06:09: S250729bz did not pass initial criteria
+20250731_21:06:09: S250729bz did not pass initial criteria
+20250731_21:06:09: Error getting params: could not parse GraceID: Not a superevent: MS250729m.
+20250731_21:06:09: Error getting params: could not parse GraceID: Not a superevent: MS250729m.
+20250731_21:06:09: S250729cg did not pass initial criteria
+20250731_21:06:10: S250729cg did not pass initial criteria
+20250731_21:06:10: S250729cg did not pass initial criteria
+20250731_21:06:10: S250729cg did not pass initial criteria
+20250731_21:06:10: Error getting params: could not parse GraceID: Not a superevent: MS250729n.
+20250731_21:06:10: Error getting params: could not parse GraceID: Not a superevent: MS250729n.
+20250731_21:06:10: Error getting params: could not parse GraceID: Not a superevent: MS250729o.
+20250731_21:06:10: Error getting params: could not parse GraceID: Not a superevent: MS250729o.
+20250731_21:06:10: Error getting params: could not parse GraceID: Not a superevent: MS250729p.
+20250731_21:06:10: Error getting params: could not parse GraceID: Not a superevent: MS250729p.
+20250731_21:06:10: Error getting params: could not parse GraceID: Not a superevent: MS250729q.
+20250731_21:06:10: Error getting params: could not parse GraceID: Not a superevent: MS250729q.
+20250731_21:06:10: Error getting params: could not parse GraceID: Not a superevent: MS250729r.
+20250731_21:06:10: Error getting params: could not parse GraceID: Not a superevent: MS250729r.
+20250731_21:06:10: Error getting params: could not parse GraceID: Not a superevent: MS250729s.
+20250731_21:06:10: Error getting params: could not parse GraceID: Not a superevent: MS250729s.
+20250731_21:06:10: Error getting params: could not parse GraceID: Not a superevent: MS250729t.
+20250731_21:06:10: Error getting params: could not parse GraceID: Not a superevent: MS250729t.
+20250731_21:06:10: Error getting params: could not parse GraceID: Not a superevent: MS250729u.
+20250731_21:06:10: Error getting params: could not parse GraceID: Not a superevent: MS250729u.
+20250731_21:06:10: Error getting params: could not parse GraceID: Not a superevent: MS250729v.
+20250731_21:06:10: Error getting params: could not parse GraceID: Not a superevent: MS250729v.
+20250731_21:06:10: Error getting params: could not parse GraceID: Not a superevent: MS250729w.
+20250731_21:06:10: Error getting params: could not parse GraceID: Not a superevent: MS250729w.
+20250731_21:06:10: Error getting params: could not parse GraceID: Not a superevent: MS250729x.
+20250731_21:06:10: Error getting params: could not parse GraceID: Not a superevent: MS250729x.
+20250731_21:06:10: Error getting params: could not parse GraceID: Not a superevent: MS250730a.
+20250731_21:06:10: Error getting params: could not parse GraceID: Not a superevent: MS250730a.
+20250731_21:06:10: Error getting params: could not parse GraceID: Not a superevent: MS250730b.
+20250731_21:06:10: Error getting params: could not parse GraceID: Not a superevent: MS250730b.
+20250731_21:06:10: Error getting params: could not parse GraceID: Not a superevent: MS250730c.
+20250731_21:06:10: Error getting params: could not parse GraceID: Not a superevent: MS250730c.
+20250731_21:06:10: Error getting params: could not parse GraceID: Not a superevent: MS250730d.
+20250731_21:06:10: Error getting params: could not parse GraceID: Not a superevent: MS250730d.
+20250731_21:06:10: Error getting params: could not parse GraceID: Not a superevent: MS250730e.
+20250731_21:06:10: Error getting params: could not parse GraceID: Not a superevent: MS250730e.
+20250731_21:06:10: Error getting params: could not parse GraceID: Not a superevent: MS250730f.
+20250731_21:06:10: Error getting params: could not parse GraceID: Not a superevent: MS250730f.
+20250731_21:06:10: Error getting params: could not parse GraceID: Not a superevent: MS250730g.
+20250731_21:06:10: Error getting params: could not parse GraceID: Not a superevent: MS250730g.
+20250731_21:06:10: Error getting params: could not parse GraceID: Not a superevent: MS250730h.
+20250731_21:06:10: Error getting params: could not parse GraceID: Not a superevent: MS250730h.
+20250731_21:06:10: Error getting params: could not parse GraceID: Not a superevent: MS250730i.
+20250731_21:06:10: Error getting params: could not parse GraceID: Not a superevent: MS250730i.
+20250731_21:06:10: Error getting params: could not parse GraceID: Not a superevent: MS250730j.
+20250731_21:06:10: Error getting params: could not parse GraceID: Not a superevent: MS250730j.
+20250731_21:06:10: Error getting params: could not parse GraceID: Not a superevent: MS250730k.
+20250731_21:06:10: Error getting params: could not parse GraceID: Not a superevent: MS250730k.
+20250731_21:06:10: Error getting params: could not parse GraceID: Not a superevent: MS250730l.
+20250731_21:06:10: Error getting params: could not parse GraceID: Not a superevent: MS250730l.
+20250731_21:06:10: Error getting params: could not parse GraceID: Not a superevent: MS250730m.
+20250731_21:06:10: Error getting params: could not parse GraceID: Not a superevent: MS250730m.
+20250731_21:06:11: S250730a did not pass initial criteria
+20250731_21:06:11: S250730a did not pass initial criteria
+20250731_21:06:11: S250730a did not pass initial criteria
+20250731_21:06:12: S250730a did not pass initial criteria
+20250731_21:06:12: Error getting params: could not parse GraceID: Not a superevent: MS250730n.
+20250731_21:06:12: Error getting params: could not parse GraceID: Not a superevent: MS250730n.
+20250731_21:06:12: S250730c did not pass initial criteria
+20250731_21:06:12: S250730c did not pass initial criteria
+20250731_21:06:13: S250730c did not pass initial criteria
+20250731_21:06:13: S250730c did not pass initial criteria
+20250731_21:06:13: S250730d did not pass initial criteria
+20250731_21:06:14: S250730d did not pass initial criteria
+20250731_21:06:14: Error getting params: could not parse GraceID: Not a superevent: MS250730o.
+20250731_21:06:14: Error getting params: could not parse GraceID: Not a superevent: MS250730o.
+20250731_21:06:14: Error getting params: could not parse GraceID: Not a superevent: MS250730p.
+20250731_21:06:14: Error getting params: could not parse GraceID: Not a superevent: MS250730p.
+20250731_21:06:14: Error getting params: could not parse GraceID: Not a superevent: MS250730q.
+20250731_21:06:14: Error getting params: could not parse GraceID: Not a superevent: MS250730q.
+20250731_21:06:14: Error getting params: could not parse GraceID: Not a superevent: MS250730r.
+20250731_21:06:14: Error getting params: could not parse GraceID: Not a superevent: MS250730r.
+20250731_21:06:14: Error getting params: could not parse GraceID: Not a superevent: MS250730s.
+20250731_21:06:14: Error getting params: could not parse GraceID: Not a superevent: MS250730s.
+20250731_21:06:14: S250730r did not pass initial criteria
+20250731_21:06:14: S250730r did not pass initial criteria
+20250731_21:06:14: Error getting params: could not parse GraceID: Not a superevent: MS250730t.
+20250731_21:06:15: S250730r did not pass initial criteria
+20250731_21:06:15: S250730r did not pass initial criteria
+20250731_21:06:15: Error getting params: could not parse GraceID: Not a superevent: MS250730t.
+20250731_21:06:15: Error getting params: could not parse GraceID: Not a superevent: MS250730u.
+20250731_21:06:15: Error getting params: could not parse GraceID: Not a superevent: MS250730u.
+20250731_21:06:15: Error getting params: could not parse GraceID: Not a superevent: MS250730v.
+20250731_21:06:15: S250730u did not pass initial criteria
+20250731_21:06:16: S250730u did not pass initial criteria
+20250731_21:06:16: Error getting params: could not parse GraceID: Not a superevent: MS250730v.
+20250731_21:06:16: S250730u did not pass initial criteria
+20250731_21:06:16: S250730u did not pass initial criteria
+20250731_21:06:16: Error getting params: could not parse GraceID: Not a superevent: MS250730w.
+20250731_21:06:16: Error getting params: could not parse GraceID: Not a superevent: MS250730w.
+20250731_21:06:17: S250730x did not pass initial criteria
+20250731_21:06:17: S250730x did not pass initial criteria
+20250731_21:06:17: S250730x did not pass initial criteria
+20250731_21:06:18: S250730x did not pass initial criteria
+20250731_21:06:18: Error getting params: could not parse GraceID: Not a superevent: MS250730x.
+20250731_21:06:18: S250730z did not pass initial criteria
+20250731_21:06:18: S250730z did not pass initial criteria
+20250731_21:06:18: Error getting params: could not parse GraceID: Not a superevent: MS250730x.
+20250731_21:06:19: S250730z did not pass initial criteria
+20250731_21:06:19: S250730z did not pass initial criteria
+20250731_21:06:19: S250730ab did not pass initial criteria
+20250731_21:06:19: S250730ab did not pass initial criteria
+20250731_21:06:20: S250730ab did not pass initial criteria
+20250731_21:06:20: S250730ab did not pass initial criteria
+20250731_21:06:20: Error getting params: could not parse GraceID: Not a superevent: MS250731a.
+20250731_21:06:20: Error getting params: could not parse GraceID: Not a superevent: MS250731a.
+20250731_21:06:21: S250731f did not pass initial criteria
+20250731_21:06:21: S250731f did not pass initial criteria
+20250731_21:06:37: S250731f did not pass initial criteria
+20250731_21:06:37: S250731f did not pass initial criteria
+20250731_21:06:37: Error getting params: could not parse GraceID: Not a superevent: MS250731b.
+20250731_21:06:37: Error getting params: could not parse GraceID: Not a superevent: MS250731b.
+20250731_21:06:37: Error getting params: could not parse GraceID: Not a superevent: MS250731c.
+20250731_21:06:37: Error getting params: could not parse GraceID: Not a superevent: MS250731c.
+20250731_21:06:37: Error getting params: could not parse GraceID: Not a superevent: MS250731d.
+20250731_21:06:37: Error getting params: could not parse GraceID: Not a superevent: MS250731d.
+20250731_21:06:38: S250731y did not pass initial criteria
+20250731_21:06:38: S250731y did not pass initial criteria
+20250731_21:06:39: S250731y did not pass initial criteria
+20250731_21:06:39: S250731y did not pass initial criteria
+20250731_21:06:39: Error getting params: could not parse GraceID: Not a superevent: MS250731e.
+20250731_21:06:39: Error getting params: could not parse GraceID: Not a superevent: MS250731e.
+20250731_21:06:39: Error getting params: could not parse GraceID: Not a superevent: MS250731f.
+20250731_21:06:39: Error getting params: could not parse GraceID: Not a superevent: MS250731f.
+20250731_21:06:39: Error getting params: could not parse GraceID: Not a superevent: MS250731g.
+20250731_21:06:39: Error getting params: could not parse GraceID: Not a superevent: MS250731g.
+20250731_21:06:39: Error getting params: could not parse GraceID: Not a superevent: MS250731h.
+20250731_21:06:39: Error getting params: could not parse GraceID: Not a superevent: MS250731h.
+20250731_21:06:39: Error getting params: could not parse GraceID: Not a superevent: MS250731i.
+20250731_21:06:39: Error getting params: could not parse GraceID: Not a superevent: MS250731i.
+20250731_21:06:39: Error getting params: could not parse GraceID: Not a superevent: MS250731j.
+20250731_21:06:39: Error getting params: could not parse GraceID: Not a superevent: MS250731j.
+20250731_21:06:39: Error getting params: could not parse GraceID: Not a superevent: MS250731k.
+20250731_21:06:39: Error getting params: could not parse GraceID: Not a superevent: MS250731k.
+20250731_21:06:39: Error getting params: could not parse GraceID: Not a superevent: MS250731l.
+20250731_21:06:39: Error getting params: could not parse GraceID: Not a superevent: MS250731l.
+20250731_21:06:39: Error getting params: could not parse GraceID: Not a superevent: MS250731m.
+20250731_21:06:39: Error getting params: could not parse GraceID: Not a superevent: MS250731m.
+20250731_21:06:39: S250731av did not pass initial criteria
+20250731_21:06:40: S250731av did not pass initial criteria
+20250731_21:06:40: S250731av did not pass initial criteria
+20250731_21:06:40: S250731av did not pass initial criteria
+20250731_21:06:40: Error getting params: could not parse GraceID: Not a superevent: MS250731n.
+20250731_21:06:40: Error getting params: could not parse GraceID: Not a superevent: MS250731n.
+20250731_21:06:41: S250731bf did not pass initial criteria
+20250731_21:06:41: S250731bf did not pass initial criteria
+20250731_21:06:41: S250731bf did not pass initial criteria
+20250731_21:06:41: S250731bf did not pass initial criteria
+20250731_21:06:41: Error getting params: could not parse GraceID: Not a superevent: MS250731o.
+20250731_21:06:41: Error getting params: could not parse GraceID: Not a superevent: MS250731o.
+20250731_21:06:41: Error getting params: could not parse GraceID: Not a superevent: MS250731p.
+20250731_21:06:41: Error getting params: could not parse GraceID: Not a superevent: MS250731p.
+20250731_21:06:41: Error getting params: could not parse GraceID: Not a superevent: MS250731q.
+20250731_21:06:41: Error getting params: could not parse GraceID: Not a superevent: MS250731q.
+20250731_21:06:41: Error getting params: could not parse GraceID: Not a superevent: MS250731r.
+20250731_21:06:41: Error getting params: could not parse GraceID: Not a superevent: MS250731r.
+20250731_21:06:41: Error getting params: could not parse GraceID: Not a superevent: MS250731s.
+20250731_21:06:41: Error getting params: could not parse GraceID: Not a superevent: MS250731s.
+20250731_21:06:41: Error getting params: could not parse GraceID: Not a superevent: MS250731t.
+20250731_21:06:41: Error getting params: could not parse GraceID: Not a superevent: MS250731t.
+20250731_21:06:41: Error getting params: could not parse GraceID: Not a superevent: MS250731u.
+20250731_21:06:41: Error getting params: could not parse GraceID: Not a superevent: MS250731u.
+20250731_21:06:42: Processing S250727dc from Update alert
+20250731_21:06:43: Found: mchirp_source.json
+20250731_21:07:35: Starting cadence.py at at 2025-07-31 21:07:35.846455 with testing = False
+20250731_21:07:36: retry: []
+20250731_21:07:36: followup: []
+20250731_21:07:43: S250727dc passed mass criteria
+20250731_21:08:45: Submitting plan request for S250727dc
+20250731_21:09:15: Total time: 0, probability: 0.0
+20250731_21:09:46: checked ZTF observing queue for key words related to S250727dc
+20250731_21:09:46: Followup plan for S250727dc with 0 seconds and 0.0 probability does not meet criteria
+20250731_21:09:47: Followup plan for S250727dc with 0 seconds and 0.0 probability does not meet criteria
+20250731_21:09:47: Error getting params: could not parse GraceID: Not a superevent: MS250730h.
+20250731_21:09:47: Error getting params: could not parse GraceID: Not a superevent: MS250730i.
+20250731_21:09:47: Error getting params: could not parse GraceID: Not a superevent: MS250730o.
+20250731_21:09:47: Error getting params: could not parse GraceID: Not a superevent: MS250730q.
+20250731_21:09:47: Error getting params: could not parse GraceID: Not a superevent: MS250730s.
+20250731_21:09:47: Error getting params: could not parse GraceID: Not a superevent: MS250730v.
+20250731_21:09:47: Error getting params: could not parse GraceID: Not a superevent: MS250731i.
+20250731_21:09:47: Error getting params: could not parse GraceID: Not a superevent: MS250731n.
+20250731_21:09:47: Error getting params: could not parse GraceID: Not a superevent: MS250731o.
+20250731_21:09:47: Error getting params: could not parse GraceID: Not a superevent: MS250731r.
+20250731_21:09:47: Error getting params: could not parse GraceID: Not a superevent: MS250731u.
