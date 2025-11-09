@@ -224,10 +224,9 @@ def trigger_on_cadence(path_data):
     )
     df["gcn_id"] = df["gcn_id"].astype("int", errors="ignore")
     df["localization_id"] = df["localization_id"].astype("int", errors="ignore")
-
     trigger = []
     for row in df.itertuples(index=False):
-        if row.valid != "True":
+        if row.valid != True:
             continue
         cadence_str = row.trigger_cadence
         cadence = cadence_str.strip("[]").replace("'", "").split(", ")

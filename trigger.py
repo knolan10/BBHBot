@@ -321,8 +321,8 @@ while True:
                         observation_plan_request_id,
                         start_observation,
                     )
-                    logmessage = f"There is recent coverage of {round(frac_observed * 100)} % of {superevent_id} - not triggering"
-                    logger.log(logmessage)
+                    email_message = f"{superevent_id} is good. Serendipitious coverage {round(frac_observed * 100)} % of {superevent_id} - not triggering"
+                    logger.log(email_message)
 
                 else:
                     if testing:
@@ -333,7 +333,7 @@ while True:
                         time.sleep(30)
                         trigger_ztf(observation_plan_request_id, fritz_token, mode)
                         logger.log(f"Triggered ZTF for {superevent_id} at {Time.now()}")
-                    message = f"ZTF Triggered for {superevent_id}"
+                    email_message = f"ZTF Triggered for {superevent_id}"
                     serendipitious_observation = None
 
                 # write to triggered_events.csv
@@ -355,7 +355,7 @@ while True:
                     valid,
                     path_data,
                 )
-                send_trigger_email(credentials, message, dateobs)
+                send_trigger_email(credentials, email_message, dateobs)
 
                 logger.log("post-trigger sleep")
                 time.sleep(

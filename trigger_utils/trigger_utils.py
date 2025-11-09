@@ -11,6 +11,7 @@ from astroplan import Observer
 import datetime
 from datetime import timedelta
 import requests
+import os
 from io import BytesIO
 import json
 import pickle
@@ -183,12 +184,17 @@ def query_mchirp_gracedb(event, path_data):
     files = client.files(event).json()
     file_data = None
 
+    # Ensure output directory exists
+    output_dir = os.path.join(path_data, "mchirp")
+    os.makedirs(output_dir, exist_ok=True)
+
     for fname in files:
         if "mchirp_source" in fname and fname.endswith(".json"):
             logmessage = f"Found: {fname}"
             logger.log(logmessage, slack=False)
             file_data = client.files(event, fname)
-            with open(f"{path_data}/mchirp/mchirp_source_{event}.json", "wb") as f:
+            output_path = os.path.join(output_dir, f"mchirp_source_{event}.json")
+            with open(output_path, "wb") as f:
                 f.write(file_data.read())
             break
 
@@ -197,13 +203,15 @@ def query_mchirp_gracedb(event, path_data):
         logger.log(logmessage, slack=False)
         return None
 
-    with open(f"{path_data}/mchirp/mchirp_source_{event}.json", "r") as f:
+    # Read back JSON file
+    output_path = os.path.join(output_dir, f"mchirp_source_{event}.json")
+    with open(output_path, "r") as f:
         data = json.load(f)
 
     max_index = data["probabilities"].index(max(data["probabilities"]))
     bin_edges = data["bin_edges"]
 
-    # return the left edge of the most probable bin
+    # Return the left edge of the most probable bin
     return bin_edges[max_index]
 
 
@@ -574,6 +582,10 @@ def add_triggercsv(
     valid,
     path_data,
 ):
+    # FIXME: need better logic for handling update alerts (ie, we dont want cadence to start ~ 2 days late given update alert)
+    # if the event already exists in the log, change "valid" to "false" so we use the new event
+    update_trigger_log(superevent_id, "valid", False, path_data)
+
     # Create a DataFrame with the new event data
     new_event = pd.DataFrame(
         [
