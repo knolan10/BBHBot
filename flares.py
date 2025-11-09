@@ -59,9 +59,7 @@ logger.log(logmessage)
 
 # Part 0 : load current photometry status
 logger.log("PART 0: Check status, try to submit queued requests")
-do_photometry = (
-    True  # this flag will be changed to false if we hit the 15000 request limit
-)
+do_photometry = True  # this flag will be changed to false if we hit the 15000 request limit
 
 followup = PhotometryLog(
     path_data,

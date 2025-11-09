@@ -283,7 +283,10 @@ class GetSuperevents:
         mass = [
             m_total_mlp(self.path_data, d, f, dl_bns=168.0) for d, f in zip(dist, far)
         ]
-        chirpmass = [query_mchirp_gracedb(str(x[0]), self.path_data) for x in params]
+        try:
+            chirpmass = [query_mchirp_gracedb(str(x[0]), self.path_data) for x in params]
+        except:
+            chirpmass = [0 for x in params]
         return [
             list(i) + list(j) + [k] + [chirp]
             for i, j, k, chirp in zip(params, skymap_data, mass, chirpmass)
@@ -343,154 +346,152 @@ class Fritz:
                 logmessage = f"{eventid} predates trigger"
                 logger.log(logmessage, slack=False)
                 return ["correct", "predates trigger"]
+            elif far < 10 or a90 > 1000 or mass < 60:
+                logmessage = f"Event doesnt pass criteria - correct no plan request for {eventid}"
+                logger.log(logmessage, slack=False)
+                return ["correct", "not triggered"]
             else:
-                if far < 10 or a90 > 1000 or mass < 60:
-                    logmessage = f"Event doesnt pass criteria - correct no plan request for {eventid}"
-                    logger.log(logmessage, slack=False)
-                    return ["correct", "not triggered"]
-                else:
-                    logmessage = f"Error: should have requested plan for {eventid}"
-                    logger.log(logmessage, slack=False)
-                    trigger_status = "missed plan request"
-                    return ["error", "missed plan request"]
+                logmessage = f"Error: should have requested plan for {eventid}"
+                logger.log(logmessage, slack=False)
+                trigger_status = "missed plan request"
+                return ["error", "missed plan request"]
         # now only considering events that have a plan request
+        # check whether we triggered
+        status = [x["status"] for x in matching_requests]
+        if "submitted to telescope queue" in status:
+            trigger_status = "triggered"
         else:
-            # check whether we triggered
-            status = [x["status"] for x in matching_requests]
-            if "submitted to telescope queue" in status:
-                trigger_status = "triggered"
-            else:
-                trigger_status = "not triggered"
+            trigger_status = "not triggered"
 
-            # stop considering events that predate the trigger
-            if datetime.fromisoformat(dateid) < datetime.fromisoformat(
-                "2024-09-14T00:00:00"
-            ):
-                if trigger_status == "triggered":
-                    logmessage = f"{eventid} trigger predating automated trigger"
-                    logger.log(logmessage, slack=False)
-                    return ["correct", "non-automated trigger"]
-                else:
-                    logmessage = f"{eventid} predates trigger"
-                    logger.log(logmessage, slack=False)
-                    return ["correct", "predates trigger"]
-            # now down to events with plans while the trigger is operational
+        # stop considering events that predate the trigger
+        if datetime.fromisoformat(dateid) < datetime.fromisoformat(
+            "2024-09-14T00:00:00"
+        ):
+            if trigger_status == "triggered":
+                logmessage = f"{eventid} trigger predating automated trigger"
+                logger.log(logmessage, slack=False)
+                return ["correct", "non-automated trigger"]
             else:
-                # check whether we should have triggered on the event - need to get plan statistics to check this
-                # the triggered case
-                if trigger_status == "triggered":
-                    # look at stats for the submitted plan
-                    plans = [
-                        x
-                        for x in matching_requests
-                        if x["status"] == "submitted to telescope queue"
-                    ]
-                    if len(plans) != 1:
-                        logmessage = f"Multiple triggers: inspect {eventid}"
-                        logger.log(logmessage, slack=False)
-                        return ["inspect", "multiple triggers"]
-                # the not triggered case
-                else:
-                    plans = [
-                        x
-                        for x in matching_requests
-                        if x["observation_plans"][0]["statistics"]
-                    ]
-                    if not plans:
-                        if far < 10 or a90 > 1000 or mass < 60:
-                            logmessage = f"requested plan when we shouldnt have but correctly didnt trigger - parameters dont pass criteria {eventid}"
-                            logger.log(logmessage, slack=False)
-                            return ["correct", "not triggered"]
-                        else:
-                            logmessage = f"No valid plans found for {eventid}"
-                            logger.log(logmessage, slack=False)
-                            return ["error", "no valid plan"]
-                    plans_with_observations = [
-                        x
-                        for x in plans
-                        if x["observation_plans"][0]["statistics"][0]["statistics"][
-                            "num_observations"
-                        ]
-                        != 0
-                    ]
-                    if not plans_with_observations:
-                        logmessage = f"generated observation plan returned zero coverage of {eventid}"
-                        logger.log(logmessage, slack=False)
-                        return ["correct", "not triggered"]
-                # for non triggered events take the most recent plan as truth, ie if earlier plan passes criteria but later one doesn't go by the later one
-                most_recent_plan = max(
-                    plans_with_observations, key=lambda x: x["modified"]
+                logmessage = f"{eventid} predates trigger"
+                logger.log(logmessage, slack=False)
+                return ["correct", "predates trigger"]
+        # now down to events with plans while the trigger is operational
+        # check whether we should have triggered on the event - need to get plan statistics to check this
+        # the triggered case
+        if trigger_status == "triggered":
+            # look at stats for the submitted plan
+            plans = [
+                x
+                for x in matching_requests
+                if x["status"] == "submitted to telescope queue"
+            ]
+            if len(plans) != 1:
+                logmessage = f"Multiple triggers: inspect {eventid}"
+                logger.log(logmessage, slack=False)
+                return ["inspect", "multiple triggers"]
+        # the not triggered case
+        else:
+            plans = [
+                x
+                for x in matching_requests
+                if x["observation_plans"][0]["statistics"]
+            ]
+        if not plans:
+            if far < 10 or a90 > 1000 or mass < 60:
+                logmessage = f"requested plan when we shouldnt have but correctly didnt trigger - parameters dont pass criteria {eventid}"
+                logger.log(logmessage, slack=False)
+                return ["correct", "not triggered"]
+            else:
+                logmessage = f"No valid plans found for {eventid}"
+                logger.log(logmessage, slack=False)
+                return ["error", "no valid plan"]
+        plans_with_observations = [
+            x
+            for x in plans
+            if x["observation_plans"][0]["statistics"][0]["statistics"][
+                "num_observations"
+            ]
+            != 0
+        ]
+        if not plans_with_observations:
+            logmessage = f"generated observation plan returned zero coverage of {eventid}"
+            logger.log(logmessage, slack=False)
+            return ["correct", "not triggered"]
+        # for non triggered events take the most recent plan as truth
+        # if earlier plan passes criteria but later one doesn't go by the later one
+        selected_plan = max(
+            plans_with_observations, key=lambda x: x["modified"]
+        )
+        observation_plan = selected_plan["observation_plans"]
+        stats = observation_plan[0]["statistics"]
+        total_time = stats[0]["statistics"]["total_time"]
+        probability = stats[0]["statistics"]["probability"]
+        start = stats[0]["statistics"]["start_observation"]
+        # check serendiptious coverage case
+        skymap_name = selected_plan["localization"]["localization_name"]
+        frac_observed = SkymapCoverage(
+            localdateobs=dateid,
+            localname=skymap_name,
+            localprob=0.9,
+            fritz_token=self.fritz_token,
+            fritz_mode="",  # TODO: add testing fritz api mode?
+            kowalski_username=self.kowalski_username,
+            kowalski_password=self.kowalski_password,
+        ).get_coverage_fraction()
+        if frac_observed > 0.9 * probability:
+            serendipitious_observation = True
+        else:
+            serendipitious_observation = False
+        # independently get the intended trigger status
+        if (
+            far < 10
+            or a90 > 1000
+            or mass < 60
+            or probability < 0.5
+            or total_time > 5400
+        ):
+            intended_trigger_status = "not triggered"
+        else:
+            intended_trigger_status = "triggered"
+        # compare the trigger status to the intended trigger status
+        if (
+            trigger_status == "triggered"
+            and intended_trigger_status == "triggered"
+        ):
+            logmessage = f"triggered on {eventid}"
+            logger.log(logmessage, slack=False)
+            return ["correct", "triggered", total_time, probability, start]
+        elif (
+            trigger_status == "triggered"
+            and intended_trigger_status == "not triggered"
+        ):
+            logmessage = f"Error: bad trigger for {eventid}"
+            logger.log(logmessage, slack=False)
+            return ["error", "bad trigger", total_time, probability, start]
+        elif (
+            trigger_status == "not triggered"
+            and intended_trigger_status == "triggered"
+        ):
+            if serendipitious_observation:
+                logmessage = (
+                    f"Correct no trigger: serendipitous coverage for {eventid}"
                 )
-                observation_plan = most_recent_plan["observation_plans"]
-                stats = observation_plan[0]["statistics"]
-                total_time = stats[0]["statistics"]["total_time"]
-                probability = stats[0]["statistics"]["probability"]
-                start = stats[0]["statistics"]["start_observation"]
-                # check serendiptious coverage case
-                skymap_name = most_recent_plan["localization"]["localization_name"]
-                frac_observed = SkymapCoverage(
-                    localdateobs=dateid,
-                    localname=skymap_name,
-                    localprob=0.9,
-                    fritz_token=self.fritz_token,
-                    fritz_mode="",  # TODO: add testing fritz api mode?
-                    kowalski_username=self.kowalski_username,
-                    kowalski_password=self.kowalski_password,
-                ).get_coverage_fraction()
-                if frac_observed > 0.9 * probability:
-                    serendipitious_observation = True
-                else:
-                    serendipitious_observation = False
-                # independently get the intended trigger status
-                if (
-                    far < 10
-                    or a90 > 1000
-                    or mass < 60
-                    or probability < 0.5
-                    or total_time > 5400
-                ):
-                    intended_trigger_status = "not triggered"
-                else:
-                    intended_trigger_status = "triggered"
-                # compare the trigger status to the intended trigger status
-                if (
-                    trigger_status == "triggered"
-                    and intended_trigger_status == "triggered"
-                ):
-                    logmessage = f"triggered on {eventid}"
-                    logger.log(logmessage, slack=False)
-                    return ["correct", "triggered", total_time, probability, start]
-                elif (
-                    trigger_status == "triggered"
-                    and intended_trigger_status == "not triggered"
-                ):
-                    logmessage = f"Error: bad trigger for {eventid}"
-                    logger.log(logmessage, slack=False)
-                    return ["error", "bad trigger", total_time, probability, start]
-                elif (
-                    trigger_status == "not triggered"
-                    and intended_trigger_status == "triggered"
-                ):
-                    if serendipitious_observation:
-                        logmessage = (
-                            f"Correct no trigger: serendipitous coverage for {eventid}"
-                        )
-                        logger.log(logmessage, slack=False)
-                        # note here we use dateid in place of plan start time bc we still want to generate future trigger cadence
-                        start_proxy = (
-                            dateid + ".000"
-                        )  # TODO: make cadence func smarter at handling different input formats
-                        return ["correct", "triggered", 0, frac_observed, start_proxy]
-                    logmessage = f"Error: missed trigger for {eventid}"
-                    logger.log(logmessage, slack=False)
-                    return ["error", "missed trigger", total_time, probability, start]
-                elif (
-                    trigger_status == "not triggered"
-                    and intended_trigger_status == "not triggered"
-                ):
-                    logmessage = f"not triggered on {eventid}"
-                    logger.log(logmessage, slack=False)
-                    return ["correct", "not triggered", total_time, probability, start]
+                logger.log(logmessage, slack=False)
+                # note here we use dateid in place of plan start time bc we still want to generate future trigger cadence
+                start_proxy = (
+                    dateid + ".000"
+                )  # TODO: make cadence func smarter at handling different input formats
+                return ["correct", "triggered", 0, frac_observed, start_proxy]
+            logmessage = f"Error: missed trigger for {eventid}"
+            logger.log(logmessage, slack=False)
+            return ["error", "missed trigger", total_time, probability, start]
+        elif (
+            trigger_status == "not triggered"
+            and intended_trigger_status == "not triggered"
+        ):
+            logmessage = f"not triggered on {eventid}"
+            logger.log(logmessage, slack=False)
+            return ["correct", "not triggered", total_time, probability, start]
 
     def get_trigger_status(self):
         plans = self.query_fritz_observation_plans(self.allocation, self.fritz_token)
