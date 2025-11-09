@@ -5,6 +5,7 @@ data/trigger_data
 data/mlp_model.sav
 data/mchirp
 data/logs/
+data/mlp_model.sav
 
 dev/
 
