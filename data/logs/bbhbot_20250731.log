@@ -278,3 +278,29 @@
 20250731_21:09:47: Error getting params: could not parse GraceID: Not a superevent: MS250731o.
 20250731_21:09:47: Error getting params: could not parse GraceID: Not a superevent: MS250731r.
 20250731_21:09:47: Error getting params: could not parse GraceID: Not a superevent: MS250731u.
+20250731_21:53:51: Error getting params: could not parse GraceID: Not a superevent: MS250731v.
+20250731_21:58:26: Error getting params: could not parse GraceID: Not a superevent: MS250731v.
+20250731_22:00:05: Starting flares.py at at 2025-07-31 22:00:05.076918 with testing = False
+20250731_22:00:05: PART 0: Check status, try to submit queued requests
+20250731_22:00:05: Waiting for photometry: ['S250712cd']
+20250731_22:00:05: Needs photometry request: []
+20250731_22:00:07: No pending jobs
+20250731_22:00:07: PART 1: Photometry Requests
+20250731_22:00:09: 35 significant superevents in O4c
+20250731_22:00:18: 0 new events to process (cut 3 low prob bbh events)
+20250731_22:00:18: found 0 new events
+20250731_22:00:19: 0 errors, 0 correct, 0 inspect
+20250731_22:00:19: No new events to add
+20250731_22:00:20: Crossmatching 0 events: []
+20250731_22:00:20: No catnorth crossmatch
+20250731_22:00:20: 6 O4c events with FAR > 10 and mchirp>22 (mass > 60) and area < 1000 sq deg
+20250731_22:03:47: Error getting params: could not parse GraceID: Not a superevent: MS250731v.
+20250731_22:31:31: S250731bs did not pass initial criteria
+20250731_22:31:31: S250731bs did not pass initial criteria
+20250731_22:36:04: S250731bs did not pass initial criteria
+20250731_22:36:04: S250731bs did not pass initial criteria
+20250731_22:53:52: Error getting params: could not parse GraceID: Not a superevent: MS250731w.
+20250731_22:58:26: Error getting params: could not parse GraceID: Not a superevent: MS250731w.
+20250731_23:03:47: Error getting params: could not parse GraceID: Not a superevent: MS250731w.
+20250731_23:53:54: Error getting params: could not parse GraceID: Not a superevent: MS250731x.
+20250731_23:58:30: Error getting params: could not parse GraceID: Not a superevent: MS250731x.

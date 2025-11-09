@@ -1,10 +1,11 @@
 config/Credentials.yaml
 
-data/flare_data/dicts
-data/flare_data/queued_for_photometry
-data/flare_data/completed_queued_photometry
-data/flare_data/ZFPS
+data/flare_data/
+data/trigger_data
+data/mlp_model.sav
+data/mchirp
+data/logs/
 
-dev/data/
+dev/
 
 **/__pycache__/
