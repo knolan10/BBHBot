@@ -1,6 +1,8 @@
 config/Credentials.yaml
 
-data/flare_data/
+data/flare_data/*
+!data/flare_data/flares/
+!data/flare_data/flares/**
 data/trigger_data
 data/mlp_model.sav
 data/mchirp
