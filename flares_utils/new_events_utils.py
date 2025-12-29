@@ -192,6 +192,8 @@ class GetSuperevents:
                 fritz_dateid,
             )
         except MyException as e:
+            print(e)
+            print(response)
             logmessage = f"error loading xml: {response}: {e}"
             logger.log(logmessage, slack=False)
 

@@ -1,0 +1,10 @@
+20251211_17:01:10: 71 significant superevents in O4c
+20251211_17:02:02: 45 / 60 events in O4c are not priority
+20251211_17:02:38: about 15255 / 15819 coords should be in ZTF footprint
+20251211_17:02:38: Submit in 11 batches
+20251211_17:02:38: Saving 1 queued photometry to ../data/flare_data/queued_for_photometry/S251108fi.json
+20251211_17:02:38: Retrieved 15000 AGN for submission now
+20251211_17:03:41: Testing mode - no submission
+20251211_17:03:41: S251108fi not in dictionary
+20251211_17:03:41: Submitted 15000 AGN in 10 batches at 2025-12-11 17:03:41.689
+20251211_17:09:46: 71 significant superevents in O4c

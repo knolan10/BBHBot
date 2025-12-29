@@ -10,5 +10,6 @@ data/logs/
 data/mlp_model.sav
 
 dev/
+bbhbot_dev_env
 
 **/__pycache__/
